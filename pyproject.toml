@@ -1,0 +1,12 @@
+[project]
+name = "rppm-bullet-journal"
+version = "0.1.0"
+description = "Bullet Journal PDF generator optimized for reMarkable Paper Pro Move (rPPM)"
+readme = "CLAUDE.md"
+requires-python = ">=3.10"
+dependencies = [
+  "PyMuPDF>=1.23,<2.0",
+]
+
+[tool.uv]
+package = false
