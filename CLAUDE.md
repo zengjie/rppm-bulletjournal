@@ -4,24 +4,28 @@ This project generates a Bullet Journal PDF optimized for reMarkable Paper Pro M
 
 ## Project Structure
 
-- `generate_rppm_pdf_v2.py` - Main script to generate the PDF
+- `generate_rppm_pdf_v2.py` - Main entry point
+- `rppm/` - Modular generator (config, calendar model, rendering, validation)
 - `original/Bullet Journal.pdf` - Original reference PDF
 - `output/BulletJournal_rPPM_v2.pdf` - Generated output
 
 ## Usage
 
 ```bash
-python3 generate_rppm_pdf_v2.py
+./download_fonts.sh
+uv venv
+uv sync
+uv run python generate_rppm_pdf_v2.py
 ```
 
 ## Requirements
 
-- Python 3
-- PyMuPDF (`fitz`)
-- EB Garamond font installed at `/Library/Fonts/EBGaramond-Regular.ttf`
+- Python 3.10+
+- PyMuPDF (`fitz`) via `pyproject.toml`
+- EB Garamond fonts downloaded to `fonts/` (use `./download_fonts.sh`)
 
 ## Output Specifications
 
 - Page size: 954 x 1696 pixels
 - Optimized for rPPM screen with top toolbar safe zone (130px)
-- 546 pages total
+- Dynamic page count based on calendar/year and settings
