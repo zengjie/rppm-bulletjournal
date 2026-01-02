@@ -319,15 +319,15 @@ class Renderer:
         # Smaller lightning icon
         self.draw_lightning(page, self.layout.content_left, text_y + 2, scale=1.4)
 
-        # Footer text in gray - strip rich text markers for simple rendering
+        # Footer text in black - strip rich text markers for simple rendering
         plain_text = footer_text.replace("|", "")
         self.add_text(
             page,
             plain_text,
             self.layout.content_left + 30,
             text_y,
-            font_size=self.typography.sizes["footer"] - 2,
-            color=self.theme.gray,
+            font_size=self.typography.sizes["footer"],
+            color=self.theme.black,
         )
 
     def add_nav_link(
@@ -354,8 +354,9 @@ class Renderer:
 
         self.add_text(page, text, text_x, y, font_size)
 
+        # Larger clickable area for touch-friendly operation on reMarkable
         text_width = self.get_text_width(text, font_size)
-        link_rect = (x - 5, y - 2, text_x + text_width + 10, y + font_size + 6)
+        link_rect = (x - 10, y - 10, text_x + text_width + 15, y + font_size + 12)
         self.links.add(page_idx, link_rect, dest_page_idx)
 
     def add_bottom_nav(self, page_idx: int, links: list[tuple[str, int]]) -> None:

@@ -92,8 +92,8 @@ class BulletJournalGenerator:
             generate_monthly_action_plan(ctx, page_map.month_action_plan(month_idx), month_idx)
 
         for week_idx in range(calendar.weeks_in_year):
-            generate_weekly_action_plan(ctx, page_map.weekly_action(week_idx))
-            generate_weekly_reflection(ctx, page_map.weekly_reflection(week_idx))
+            generate_weekly_action_plan(ctx, page_map.weekly_action(week_idx), week_idx)
+            generate_weekly_reflection(ctx, page_map.weekly_reflection(week_idx), week_idx)
 
         for month in calendar.months:
             for day in range(1, month.days + 1):
