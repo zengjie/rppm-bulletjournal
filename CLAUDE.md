@@ -29,3 +29,16 @@ uv run python main.py
 - Page size: 954 x 1696 pixels
 - Optimized for rPPM screen with top toolbar safe zone (130px)
 - Dynamic page count based on calendar/year and settings
+
+## Development Workflow
+
+When modifying page layout or rendering code:
+
+1. Run `uv run python main.py` to generate the PDF
+2. Extract screenshots of affected pages to `screenshots/` directory (not tracked by git)
+3. Verify layout, alignment, font sizes, and spacing visually before considering the task complete
+4. Pay special attention to:
+   - Symbol alignment (Signifiers, N.A.M.E. symbols, text should be vertically aligned)
+   - Font readability and consistency
+   - Proper use of page margins and content area
+   - Link target accuracy (if applicable)

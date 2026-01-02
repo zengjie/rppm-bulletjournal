@@ -19,10 +19,10 @@ from .render import (
     generate_daily_log_continuation,
     generate_future_log,
     generate_guide_goals,
-    generate_guide_how_to_reflect,
     generate_guide_intention,
     generate_guide_practice,
     generate_guide_set_up_logs,
+    generate_guide_symbol_reference,
     generate_guide_system,
     generate_main_index,
     generate_monthly_action_plan,
@@ -30,7 +30,7 @@ from .render import (
     generate_weekly_action_plan,
     generate_weekly_reflection,
     generate_year_index,
- )
+)
 from .validation import ValidationReport
 
 
@@ -77,10 +77,10 @@ class BulletJournalGenerator:
         generate_collection_index(ctx, page_map.collection_index_c, "C")
         generate_collection_index(ctx, page_map.collection_index_d, "D")
 
-        generate_guide_system(ctx, page_map.guide_start)
-        generate_guide_set_up_logs(ctx, page_map.guide_start + 1)
+        generate_guide_symbol_reference(ctx, page_map.guide_start)
+        generate_guide_system(ctx, page_map.guide_start + 1)
         generate_guide_practice(ctx, page_map.guide_start + 2)
-        generate_guide_how_to_reflect(ctx, page_map.guide_start + 3)
+        generate_guide_set_up_logs(ctx, page_map.guide_start + 3)
         generate_guide_intention(ctx, page_map.guide_start + 4)
         generate_guide_goals(ctx, page_map.guide_start + 5)
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Settings:
     year: int = 2026
-    pages_per_day: int = 2
+    pages_per_day: int = 1
     pages_per_collection: int = 1
 
     num_guide_pages: int = 6

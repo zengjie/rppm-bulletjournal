@@ -12,45 +12,15 @@ from .primitives import Renderer
 
 
 FOOTER_TEXTS = {
-    "daily_log": (
-        "This is your |Daily Log,| designed to declutter your mind and keep you focused "
-        "throughout the day. |Rapid Log| your thoughts as they bubble up. Add a note page "
-        "with the Dot S template if you need more space for notes. You'll find this in "
-        "Document settings in the toolbar."
-    ),
-    "weekly_action": (
-        "Write down only what you can get done this week. Think of this as your weekly "
-        "commitments. If something is too big, break into smaller steps. When you're done, "
-        "number the top three things that would make this week a success."
-    ),
-    "weekly_reflection": (
-        "Tidy your weekly entries. Update the monthly timeline and action plan. Acknowledge "
-        "up to three things that moved you toward, and up to three things that moved you away, "
-        "from the life you want/who you want to be, in a few sentences. Migrate only relevant "
-        "|Actions| into the next week's Action Plan. Enact any insight from your reflection "
-        "into the action plan."
-    ),
-    "collection_index": (
-        "Use this index to organize and group related information by topic. We call them "
-        "|Collections.| Common Collections include goals, fitness trackers, reading lists, "
-        "class notes, and more. To keep your Collections organized, simply add your Collection "
-        "to the list and use the links to quickly find your content."
-    ),
-    "future_log": (
-        "The Future log is a |Collection| where you can store |actions| and |events| that fall "
-        "outside the current month. More than just being a type of calendar, the Future log also "
-        "provides an overview of your commitments over time."
-    ),
-    "monthly_timeline": (
-        "This page is your |Timeline.| Though it can be used as a traditional calendar by adding "
-        "upcoming events, it's recommended to use the Timeline to log events after they've happened. "
-        "This will provide a more accurate and useful record of your life."
-    ),
-    "monthly_action": (
-        "This page is your |Monthly Action Plan.| It's designed to help you organize and prioritize "
-        "your monthly |tasks.| It consists of new tasks, Future Log items scheduled for this month, "
-        "and any important unfinished tasks from the previous month."
-    ),
+    "daily_log": "Rapid log your thoughts as they bubble up.",
+    "weekly_action": "Write only what you can get done this week.",
+    "weekly_reflection": "Tidy, acknowledge, migrate, enact.",
+    "collection_index": "Organize related information by topic.",
+    "future_log": "Store actions and events outside the current month.",
+    "monthly_timeline": "Log events after they happen for an accurate record.",
+    "monthly_action": "Organize and prioritize your monthly tasks.",
+    "intention": "Intention is a commitment to a process. It guides your choices in the present moment.",
+    "goals": "Goals define outcomes. They transform desires into tangible destinations.",
 }
 
 
@@ -99,16 +69,16 @@ def generate_main_index(ctx: PageContext, page_idx: int) -> None:
     row_height = 52
 
     guide_links = [
-        ("Bullet Journal Guide", ctx.page_map.guide_start),
-        ("Set up logs", ctx.page_map.guide_start + 1),
-        ("The Practice Overview", ctx.page_map.guide_start + 2),
-        ("How to reflect", ctx.page_map.guide_start + 3),
+        ("Symbol Reference", ctx.page_map.guide_start),
+        ("The System", ctx.page_map.guide_start + 1),
+        ("The Practice", ctx.page_map.guide_start + 2),
+        ("Set up your logs", ctx.page_map.guide_start + 3),
         ("Intention", ctx.page_map.guide_start + 4),
         ("Goals", ctx.page_map.guide_start + 5),
         ("Future log", ctx.page_map.future_log_start),
     ]
 
-    for text, dest in guide_links:
+    for i, (text, dest) in enumerate(guide_links):
         ctx.renderer.add_nav_link(page_idx, text, dest, ctx.layout.content_left, y, ctx.typography.sizes["body"], with_arrow=False)
         arrow_y = y + ctx.typography.sizes["body"] * 0.65
         arrow_x = ctx.layout.content_right - 25
@@ -123,6 +93,13 @@ def generate_main_index(ctx: PageContext, page_idx: int) -> None:
         )
         y += row_height
 
+    # Decorative separator between Guide section and calendar tables
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left, y + 10),
+        fitz.Point(ctx.layout.content_right, y + 10),
+        color=ctx.theme.gray,
+        width=1.5,
+    )
     y += 35
 
     month_col_width = 180
@@ -298,400 +275,833 @@ def generate_collection_index(ctx: PageContext, page_idx: int, letter: str) -> N
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["collection_index"])
 
 
-def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
+def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
+    """Generate Symbol Reference page - quick reference for all symbols with elegant design."""
     page = ctx.renderer.doc[page_idx]
-    font_body = 26
-    line_height = 1.5
+    font_header = 28
+    font_section = 22
+    font_desc = 22
+    line_height = 1.8
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
-    ctx.renderer.add_text(page, "The Bullet Journal Guide: System", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
+    ctx.renderer.add_text(page, "Symbol Reference", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
+
+    # Card dimensions and positions
+    card_gap = 25
+    card_padding = 20
+    content_width = ctx.layout.content_width
+    card_width = (content_width - card_gap * 2) // 3
+    y_start = ctx.layout.content_top + 130
+
+    # Card heights - calculate based on content
+    card1_rows = 4  # N.A.M.E.
+    card2_rows = 5  # Action States
+    card3_rows = 3  # Signifiers
+    row_height = font_desc * line_height
+    max_rows = max(card1_rows, card2_rows, card3_rows)
+    card_height = 45 + row_height * max_rows + card_padding
+
+    # Card positions
+    card1_x = ctx.layout.content_left
+    card2_x = ctx.layout.content_left + card_width + card_gap
+    card3_x = ctx.layout.content_left + card_width * 2 + card_gap * 2
+
+    # Draw card backgrounds with subtle borders
+    for card_x in [card1_x, card2_x, card3_x]:
+        page.draw_rect(
+            fitz.Rect(card_x, y_start, card_x + card_width, y_start + card_height),
+            color=ctx.theme.gray,
+            width=0.5,
+        )
+
+    symbol_x_offset = card_padding + 5
+    desc_x_offset = card_padding + 50
+
+    # Helper to draw symbols
+    def draw_dash(x: float, y: float, size: int = 14) -> None:
+        page.draw_line(fitz.Point(x, y), fitz.Point(x + size, y), color=ctx.theme.black, width=2.2)
+
+    def draw_dot(x: float, y: float, r: int = 5) -> None:
+        page.draw_circle(fitz.Point(x + r, y), r, color=ctx.theme.black, fill=ctx.theme.black)
+
+    def draw_double_line(x: float, y: float, size: int = 14) -> None:
+        for offset in [-4, 4]:
+            page.draw_line(fitz.Point(x, y + offset), fitz.Point(x + size, y + offset), color=ctx.theme.black, width=1.8)
+
+    def draw_circle_outline(x: float, y: float, r: int = 6) -> None:
+        page.draw_circle(fitz.Point(x + r, y), r, color=ctx.theme.black, width=2)
+
+    def draw_x_mark(x: float, y: float, size: int = 10) -> None:
+        page.draw_line(fitz.Point(x, y - size / 2), fitz.Point(x + size, y + size / 2), color=ctx.theme.black, width=2.2)
+        page.draw_line(fitz.Point(x, y + size / 2), fitz.Point(x + size, y - size / 2), color=ctx.theme.black, width=2.2)
+
+    def draw_arrow_right(x: float, y: float, size: int = 10) -> None:
+        page.draw_line(fitz.Point(x, y - size / 2), fitz.Point(x + size, y), color=ctx.theme.black, width=2.2)
+        page.draw_line(fitz.Point(x, y + size / 2), fitz.Point(x + size, y), color=ctx.theme.black, width=2.2)
+
+    def draw_arrow_left(x: float, y: float, size: int = 10) -> None:
+        page.draw_line(fitz.Point(x + size, y - size / 2), fitz.Point(x, y), color=ctx.theme.black, width=2.2)
+        page.draw_line(fitz.Point(x + size, y + size / 2), fitz.Point(x, y), color=ctx.theme.black, width=2.2)
+
+    # Card 1: Rapid Logging (N.A.M.E.)
+    ctx.renderer.add_text(page, "Rapid Logging", card1_x + card_padding, y_start + card_padding, font_section)
+    y = y_start + card_padding + 45
+
+    items1 = [
+        (draw_dash, "Notes"),
+        (draw_dot, "Actions"),
+        (draw_double_line, "Moods"),
+        (draw_circle_outline, "Events"),
+    ]
+    for draw_fn, label in items1:
+        sym_y = y + font_desc * 0.55
+        draw_fn(card1_x + symbol_x_offset, sym_y)
+        ctx.renderer.add_text(page, label, card1_x + desc_x_offset, y, font_desc)
+        y += row_height
+
+    # Card 2: Action States
+    ctx.renderer.add_text(page, "Action States", card2_x + card_padding, y_start + card_padding, font_section)
+    y = y_start + card_padding + 45
+
+    # Incomplete
+    sym_y = y + font_desc * 0.55
+    draw_dot(card2_x + symbol_x_offset, sym_y)
+    ctx.renderer.add_text(page, "Incomplete", card2_x + desc_x_offset, y, font_desc)
+    y += row_height
+
+    # Complete
+    sym_y = y + font_desc * 0.55
+    draw_x_mark(card2_x + symbol_x_offset, sym_y)
+    ctx.renderer.add_text(page, "Complete", card2_x + desc_x_offset, y, font_desc)
+    y += row_height
+
+    # Migrated
+    sym_y = y + font_desc * 0.55
+    draw_arrow_right(card2_x + symbol_x_offset, sym_y)
+    ctx.renderer.add_text(page, "Migrated", card2_x + desc_x_offset, y, font_desc)
+    y += row_height
+
+    # Scheduled
+    sym_y = y + font_desc * 0.55
+    draw_arrow_left(card2_x + symbol_x_offset, sym_y)
+    ctx.renderer.add_text(page, "Scheduled", card2_x + desc_x_offset, y, font_desc)
+    y += row_height
+
+    # Irrelevant
+    sym_y = y + font_desc * 0.55
+    draw_dot(card2_x + symbol_x_offset, sym_y)
+    ctx.renderer.add_text(page, "Irrelevant", card2_x + desc_x_offset, y, font_desc)
+    text_width = ctx.renderer.get_text_width("Irrelevant", font_desc)
+    page.draw_line(fitz.Point(card2_x + symbol_x_offset, sym_y), fitz.Point(card2_x + desc_x_offset + text_width, sym_y), color=ctx.theme.black, width=1)
+
+    # Card 3: Signifiers
+    ctx.renderer.add_text(page, "Signifiers", card3_x + card_padding, y_start + card_padding, font_section)
+    y = y_start + card_padding + 45
+    icon_size = 12
+
+    # Priority
+    sym_y = y + font_desc * 0.55
+    ctx.renderer.draw_star(page, card3_x + symbol_x_offset + 6, sym_y, icon_size)
+    ctx.renderer.add_text(page, "Priority", card3_x + desc_x_offset, y, font_desc)
+    y += row_height
+
+    # Inspiration
+    sym_y = y + font_desc * 0.6
+    ctx.renderer.draw_lightbulb(page, card3_x + symbol_x_offset + 6, sym_y, icon_size)
+    ctx.renderer.add_text(page, "Inspiration", card3_x + desc_x_offset, y, font_desc)
+    y += row_height
+
+    # Explore
+    sym_y = y + font_desc * 0.55
+    ctx.renderer.draw_eye(page, card3_x + symbol_x_offset + 6, sym_y, icon_size)
+    ctx.renderer.add_text(page, "Explore", card3_x + desc_x_offset, y, font_desc)
+
+    # Example section - calculate available space and distribute evenly
+    example_start_y = y_start + card_height + 50
+    available_height = ctx.layout.content_bottom - example_start_y - 30
+
+    # Section title with decorative line
+    ctx.renderer.add_text(page, "Example", ctx.layout.content_left, example_start_y, font_header)
+    title_width = ctx.renderer.get_text_width("Example", font_header)
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left + title_width + 15, example_start_y + font_header * 0.5),
+        fitz.Point(ctx.layout.content_right, example_start_y + font_header * 0.5),
+        color=ctx.theme.gray,
+        width=0.5,
+    )
+
+    # Scenario subtitle
+    subtitle_y = example_start_y + 50
+    ctx.renderer.add_text(page, "Planning a Surprise Party", ctx.layout.content_left, subtitle_y, font_section, ctx.theme.gray, italic=True)
+
+    # Calculate row parameters to fill available space
+    header_y = subtitle_y + 50
+    num_rows = 8
+    row_area_height = available_height - (header_y - example_start_y) - 50
+    line_h = row_area_height // num_rows  # Dynamic row height
+
+    # Font sizes - larger for better fill
+    font_hw = 34
+    font_note = 16
+
+    # Two-column layout
+    col_gap = 50
+    left_col_width = 380
+    right_col_x = ctx.layout.content_left + left_col_width + col_gap
+
+    # Column headers with underline
+    ctx.renderer.add_text(page, "Recorded", ctx.layout.content_left, header_y, font_section)
+    ctx.renderer.add_text(page, "After reflection", right_col_x, header_y, font_section)
+
+    # Subtle header underline
+    underline_y = header_y + 35
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left, underline_y),
+        fitz.Point(ctx.layout.content_left + left_col_width - 30, underline_y),
+        color=ctx.theme.gray,
+        width=0.5,
+    )
+    page.draw_line(
+        fitz.Point(right_col_x, underline_y),
+        fitz.Point(ctx.layout.content_right, underline_y),
+        color=ctx.theme.gray,
+        width=0.5,
+    )
+
+    example_y = underline_y + 20
+
+    # Symbol alignment columns for left side
+    sig_col = 0
+    name_col = 35
+    text_col = 70
+
+    # Symbol size for example - larger
+    ex_dot_r = 6
+    ex_arrow = 13
+    ex_x = 13
+
+    def draw_ex_dot(x: float, y: float) -> None:
+        page.draw_circle(fitz.Point(x + ex_dot_r, y), ex_dot_r, color=ctx.theme.black, fill=ctx.theme.black)
+
+    def draw_ex_dash(x: float, y: float) -> None:
+        page.draw_line(fitz.Point(x, y), fitz.Point(x + 18, y), color=ctx.theme.black, width=2.8)
+
+    def draw_ex_double(x: float, y: float) -> None:
+        for offset in [-6, 6]:
+            page.draw_line(fitz.Point(x, y + offset), fitz.Point(x + 18, y + offset), color=ctx.theme.black, width=2.2)
+
+    def draw_ex_circle(x: float, y: float) -> None:
+        page.draw_circle(fitz.Point(x + 8, y), 8, color=ctx.theme.black, width=2.8)
+
+    def draw_ex_x(x: float, y: float) -> None:
+        page.draw_line(fitz.Point(x, y - ex_x / 2), fitz.Point(x + ex_x, y + ex_x / 2), color=ctx.theme.black, width=2.8)
+        page.draw_line(fitz.Point(x, y + ex_x / 2), fitz.Point(x + ex_x, y - ex_x / 2), color=ctx.theme.black, width=2.8)
+
+    def draw_ex_migrate(x: float, y: float) -> None:
+        page.draw_line(fitz.Point(x, y - ex_arrow / 2), fitz.Point(x + ex_arrow, y), color=ctx.theme.black, width=2.8)
+        page.draw_line(fitz.Point(x, y + ex_arrow / 2), fitz.Point(x + ex_arrow, y), color=ctx.theme.black, width=2.8)
+
+    def draw_ex_schedule(x: float, y: float) -> None:
+        page.draw_line(fitz.Point(x + ex_arrow, y - ex_arrow / 2), fitz.Point(x, y), color=ctx.theme.black, width=2.8)
+        page.draw_line(fitz.Point(x + ex_arrow, y + ex_arrow / 2), fitz.Point(x, y), color=ctx.theme.black, width=2.8)
+
+    # Example rows - each with clear structure
+    left_x = ctx.layout.content_left
+
+    # Row 1: Priority Action -> Completed
+    sym_y = example_y + font_hw * 0.5
+    ctx.renderer.draw_star(page, left_x + sig_col + 10, sym_y, 14)
+    draw_ex_dot(left_x + name_col, sym_y)
+    ctx.renderer.add_text(page, "Book venue", left_x + text_col, example_y, font_hw, italic=True)
+    draw_ex_x(right_col_x + 3, sym_y)
+    ctx.renderer.add_text(page, "completed", right_col_x + 28, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 2: Action -> Migrated
+    sym_y = example_y + font_hw * 0.5
+    draw_ex_dot(left_x + name_col, sym_y)
+    ctx.renderer.add_text(page, "Order cake", left_x + text_col, example_y, font_hw, italic=True)
+    draw_ex_migrate(right_col_x, sym_y)
+    ctx.renderer.add_text(page, "moved to tomorrow", right_col_x + 28, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 3: Action -> Scheduled
+    sym_y = example_y + font_hw * 0.5
+    draw_ex_dot(left_x + name_col, sym_y)
+    ctx.renderer.add_text(page, "Buy balloons", left_x + text_col, example_y, font_hw, italic=True)
+    draw_ex_schedule(right_col_x, sym_y)
+    ctx.renderer.add_text(page, "scheduled to Friday", right_col_x + 28, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 4: Action -> Irrelevant
+    sym_y = example_y + font_hw * 0.5
+    draw_ex_dot(left_x + name_col, sym_y)
+    ctx.renderer.add_text(page, "Print invites", left_x + text_col, example_y, font_hw, italic=True)
+    striketext = "Print invites"
+    ctx.renderer.add_text(page, striketext, right_col_x, example_y, font_hw, italic=True)
+    strike_w = ctx.renderer.get_text_width(striketext, font_hw)
+    page.draw_line(fitz.Point(right_col_x, sym_y), fitz.Point(right_col_x + strike_w, sym_y), color=ctx.theme.black, width=1.5)
+    ctx.renderer.add_text(page, "use group chat", right_col_x + strike_w + 15, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 5: Explore Note -> spawns new action
+    sym_y = example_y + font_hw * 0.5
+    ctx.renderer.draw_eye(page, left_x + sig_col + 10, sym_y, 14)
+    draw_ex_dash(left_x + name_col, sym_y)
+    ctx.renderer.add_text(page, "Music options?", left_x + text_col, example_y, font_hw, italic=True)
+    draw_ex_dot(right_col_x + 3, sym_y)
+    ctx.renderer.add_text(page, "Ask Tom for playlist", right_col_x + 28, example_y, font_hw, italic=True)
+    ctx.renderer.add_text(page, "new action", right_col_x + 28, example_y + font_hw * 0.95, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 6: Inspiration Note -> unchanged
+    sym_y = example_y + font_hw * 0.55
+    ctx.renderer.draw_lightbulb(page, left_x + sig_col + 10, sym_y, 14)
+    draw_ex_dash(left_x + name_col, sym_y)
+    ctx.renderer.add_text(page, "80s theme!", left_x + text_col, example_y, font_hw, italic=True)
+    ctx.renderer.add_text(page, "(unchanged)", right_col_x, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 7: Event -> immutable
+    sym_y = example_y + font_hw * 0.5
+    draw_ex_circle(left_x + name_col - 3, sym_y)
+    ctx.renderer.add_text(page, "Party 6pm", left_x + text_col, example_y, font_hw, italic=True)
+    ctx.renderer.add_text(page, "(events are facts)", right_col_x, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    example_y += line_h
+
+    # Row 8: Mood -> acknowledge marker
+    sym_y = example_y + font_hw * 0.5
+    draw_ex_double(left_x + name_col - 3, sym_y)
+    ctx.renderer.add_text(page, "Nervous", left_x + text_col, example_y, font_hw, italic=True)
+    ctx.renderer.add_text(page, "^", right_col_x + 6, example_y, font_hw, italic=True)
+    ctx.renderer.add_text(page, "moved toward my goal", right_col_x + 35, example_y + 10, font_note, ctx.theme.gray, italic=True)
+
+
+def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
+    """Generate The System page - elegant card-based layout for N.A.M.E. framework."""
+    page = ctx.renderer.doc[page_idx]
+    font_body = 22
+    font_section = 20
+    font_small = 18
+    line_height = 1.45
+
+    ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
+    ctx.renderer.add_text(page, "The System", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
 
     y = ctx.layout.content_top + 100
 
-    ctx.renderer.add_text(page, "Description", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    y += ctx.typography.subheader_spacing
-    desc_text = (
-        "The Bullet Journal Method is a mindfulness practice that's designed to work like a "
-        "productivity system. Be it for your career, education, family, or health, BuJo offers a lot of "
-        "resources for how to help you |write a better life.| The best way to learn how to Bullet Journal "
-        "is to experience it. This guide is designed to help you get up and running with the basics. "
-        "Below is a list of resources to help you level up your practice."
+    # Introduction - concise
+    intro_text = (
+        "The Bullet Journal Method is a mindfulness practice designed to work like a productivity system. "
+        "Use |Rapid Logging| to capture thoughts quickly with minimal syntax."
     )
-    height = ctx.renderer.draw_rich_text(page, desc_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 20
+    height = ctx.renderer.draw_rich_text(page, intro_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 20, line_height)
+    y += height + 30
 
-    ctx.renderer.add_text(page, "Rapid logging", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    y += ctx.typography.subheader_spacing
-    rapid_text = (
-        "Rapid Logging allows you to quickly capture and categorize your thoughts and feelings as "
-        "bulleted lists. Each bullet represents one of four categories of information:"
+    # N.A.M.E. Section with decorative title
+    ctx.renderer.add_text(page, "N.A.M.E.", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
+    title_w = ctx.renderer.get_text_width("N.A.M.E.", ctx.typography.sizes["subheader"])
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left + title_w + 15, y + ctx.typography.sizes["subheader"] * 0.45),
+        fitz.Point(ctx.layout.content_right, y + ctx.typography.sizes["subheader"] * 0.45),
+        color=ctx.theme.gray,
+        width=0.5,
     )
-    height = ctx.renderer.draw_rich_text(page, rapid_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 15
+    y += 40
 
-    symbol_x = ctx.layout.content_left + 12
-    desc_x = ctx.layout.content_left + 45
-    symbol_size = 12
+    # N.A.M.E. cards - 2x2 grid with larger cards
+    card_gap = 25
+    card_width = (ctx.layout.content_width - card_gap) // 2
+    card_height = 160
+    card_padding = 22
 
-    dash_y = y + font_body * 0.65
-    page.draw_line(fitz.Point(symbol_x - 2, dash_y), fitz.Point(symbol_x + symbol_size, dash_y), color=ctx.theme.black, width=2)
-    ctx.renderer.add_text(page, "Notes (things to remember)", desc_x, y, font_body)
-    y += font_body * line_height
+    name_items = [
+        ("N", "Notes", "dash", "Ideas, insights, information to remember. Capture what you learn."),
+        ("A", "Actions", "dot", "Things to do - your tasks. The backbone of your productivity."),
+        ("M", "Moods", "double", "How you feel, emotionally or physically. Track your inner state."),
+        ("E", "Events", "circle", "Experiences, appointments, milestones. Record what happens."),
+    ]
 
-    dot_y = y + font_body * 0.65
-    dot_r = 4
-    page.draw_circle(fitz.Point(symbol_x + dot_r, dot_y), dot_r, color=ctx.theme.black, fill=ctx.theme.black)
-    ctx.renderer.add_text(page, "Actions (things to do)", desc_x, y, font_body)
-    y += font_body * line_height
+    positions = [
+        (ctx.layout.content_left, y),
+        (ctx.layout.content_left + card_width + card_gap, y),
+        (ctx.layout.content_left, y + card_height + card_gap),
+        (ctx.layout.content_left + card_width + card_gap, y + card_height + card_gap),
+    ]
 
-    line_y_center = y + font_body * 0.65
-    line_len = 14
-    for offset in [-4, 4]:
-        page.draw_line(
-            fitz.Point(symbol_x - 2, line_y_center + offset),
-            fitz.Point(symbol_x + line_len - 2, line_y_center + offset),
-            color=ctx.theme.black, width=1.8,
+    def draw_symbol(sym_type: str, cx: float, cy: float, size: int = 20) -> None:
+        if sym_type == "dash":
+            page.draw_line(fitz.Point(cx - size / 2, cy), fitz.Point(cx + size / 2, cy), color=ctx.theme.black, width=3)
+        elif sym_type == "dot":
+            page.draw_circle(fitz.Point(cx, cy), size / 3, color=ctx.theme.black, fill=ctx.theme.black)
+        elif sym_type == "double":
+            for offset in [-size / 4, size / 4]:
+                page.draw_line(fitz.Point(cx - size / 2, cy + offset), fitz.Point(cx + size / 2, cy + offset), color=ctx.theme.black, width=2.5)
+        elif sym_type == "circle":
+            page.draw_circle(fitz.Point(cx, cy), size / 3, color=ctx.theme.black, width=2.5)
+
+    for i, (letter, name, sym_type, desc) in enumerate(name_items):
+        cx, cy = positions[i]
+        # Card border
+        page.draw_rect(
+            fitz.Rect(cx, cy, cx + card_width, cy + card_height),
+            color=ctx.theme.gray,
+            width=0.5,
         )
-    ctx.renderer.add_text(page, "Moods (things felt, emotionally or physically)", desc_x, y, font_body)
-    y += font_body * line_height
+        # Large letter
+        letter_x = cx + card_padding
+        letter_y = cy + card_padding
+        ctx.renderer.add_text(page, letter, letter_x, letter_y, 42)
+        # Symbol after letter - increased spacing to prevent overlap
+        sym_x = letter_x + 55
+        sym_y = letter_y + 26
+        draw_symbol(sym_type, sym_x, sym_y, 22)
+        # Name - adjusted position for new symbol spacing
+        ctx.renderer.add_text(page, name, cx + card_padding + 90, letter_y + 8, font_section + 2)
+        # Description - multi-line
+        ctx.renderer.draw_rich_text(page, desc, cx + card_padding, cy + card_padding + 60, font_small, card_width - card_padding * 2, 1.4)
 
-    circle_y = y + font_body * 0.65
-    circle_r = 5
-    page.draw_circle(fitz.Point(symbol_x + circle_r, circle_y), circle_r, color=ctx.theme.black, width=1.8)
-    ctx.renderer.add_text(page, "Events (things we experience)", desc_x, y, font_body)
-    y += font_body * line_height
+    y = positions[2][1] + card_height + 40
 
-    y += 15
-
-    action_note = (
-        "Note that we use a dot instead of checkboxes for actions. That's because they have four states "
-        "that allows us to monitor the status of an action:"
-    )
-    height = ctx.renderer.draw_rich_text(page, action_note, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 15
-
-    state_symbol_x = ctx.layout.content_left + 12
-    state_desc_x = ctx.layout.content_left + 45
-
-    dot_y = y + font_body * 0.65
-    page.draw_circle(fitz.Point(state_symbol_x + dot_r, dot_y), dot_r, color=ctx.theme.black, fill=ctx.theme.black)
-    ctx.renderer.add_text(page, "Incomplete", state_desc_x, y, font_body)
-    y += font_body * line_height
-
-    x_y = y + font_body * 0.65
-    x_size = 8
+    # Action States - horizontal flow with clearer design
+    ctx.renderer.add_text(page, "Action States", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
+    title_w = ctx.renderer.get_text_width("Action States", ctx.typography.sizes["subheader"])
     page.draw_line(
-        fitz.Point(state_symbol_x, x_y - x_size / 2),
-        fitz.Point(state_symbol_x + x_size, x_y + x_size / 2),
-        color=ctx.theme.black, width=2,
+        fitz.Point(ctx.layout.content_left + title_w + 15, y + ctx.typography.sizes["subheader"] * 0.45),
+        fitz.Point(ctx.layout.content_right, y + ctx.typography.sizes["subheader"] * 0.45),
+        color=ctx.theme.gray,
+        width=0.5,
     )
-    page.draw_line(
-        fitz.Point(state_symbol_x, x_y + x_size / 2),
-        fitz.Point(state_symbol_x + x_size, x_y - x_size / 2),
-        color=ctx.theme.black, width=2,
-    )
-    ctx.renderer.add_text(page, "Complete", state_desc_x, y, font_body)
-    y += font_body * line_height
+    y += 30
 
-    arrow_y = y + font_body * 0.65
-    arrow_size = 8
-    page.draw_line(
-        fitz.Point(state_symbol_x, arrow_y - arrow_size / 2),
-        fitz.Point(state_symbol_x + arrow_size, arrow_y),
-        color=ctx.theme.black, width=2,
-    )
-    page.draw_line(
-        fitz.Point(state_symbol_x, arrow_y + arrow_size / 2),
-        fitz.Point(state_symbol_x + arrow_size, arrow_y),
-        color=ctx.theme.black, width=2,
-    )
-    ctx.renderer.add_text(page, "Migrated (moved)", state_desc_x, y, font_body)
-    y += font_body * line_height
+    # Explanation text
+    action_intro = "A dot can transform to reflect multiple states. Each transformation is a moment of reflection."
+    ctx.renderer.add_text(page, action_intro, ctx.layout.content_left, y, font_small, ctx.theme.gray, italic=True)
+    y += 35
 
-    dot_y = y + font_body * 0.65
-    page.draw_circle(fitz.Point(state_symbol_x + dot_r, dot_y), dot_r, color=ctx.theme.black, fill=ctx.theme.black)
-    ctx.renderer.add_text(page, "Irrelevant", state_desc_x, y, font_body)
-    text_width = ctx.renderer.get_text_width("Irrelevant", font_body)
-    strike_y = y + font_body * 0.65
+    # Flow diagram - 5 states in a row
+    flow_y = y + 30
+    state_spacing = ctx.layout.content_width // 5
+    states = [
+        ("Incomplete", "dot"),
+        ("Complete", "x"),
+        ("Migrated", "arrow_r"),
+        ("Scheduled", "arrow_l"),
+        ("Irrelevant", "strike"),
+    ]
+
+    def draw_state_symbol(sym_type: str, cx: float, cy: float, size: int = 16) -> None:
+        if sym_type == "dot":
+            page.draw_circle(fitz.Point(cx, cy), size / 3, color=ctx.theme.black, fill=ctx.theme.black)
+        elif sym_type == "x":
+            hs = size / 2
+            page.draw_line(fitz.Point(cx - hs, cy - hs), fitz.Point(cx + hs, cy + hs), color=ctx.theme.black, width=2.8)
+            page.draw_line(fitz.Point(cx - hs, cy + hs), fitz.Point(cx + hs, cy - hs), color=ctx.theme.black, width=2.8)
+        elif sym_type == "arrow_r":
+            page.draw_line(fitz.Point(cx - size / 2, cy - size / 3), fitz.Point(cx + size / 2, cy), color=ctx.theme.black, width=2.8)
+            page.draw_line(fitz.Point(cx - size / 2, cy + size / 3), fitz.Point(cx + size / 2, cy), color=ctx.theme.black, width=2.8)
+        elif sym_type == "arrow_l":
+            page.draw_line(fitz.Point(cx + size / 2, cy - size / 3), fitz.Point(cx - size / 2, cy), color=ctx.theme.black, width=2.8)
+            page.draw_line(fitz.Point(cx + size / 2, cy + size / 3), fitz.Point(cx - size / 2, cy), color=ctx.theme.black, width=2.8)
+        elif sym_type == "strike":
+            # Dot with strikethrough extending to the right (simulating crossed-out text)
+            page.draw_circle(fitz.Point(cx, cy), size / 3, color=ctx.theme.black, fill=ctx.theme.black)
+            page.draw_line(fitz.Point(cx + size / 2, cy), fitz.Point(cx + size * 2.5, cy), color=ctx.theme.black, width=1.5)
+
+    # Draw states
+    for i, (name, sym_type) in enumerate(states):
+        sx = ctx.layout.content_left + state_spacing * i + state_spacing // 2
+        # Symbol
+        draw_state_symbol(sym_type, sx, flow_y, 16)
+        # Label below
+        label_w = ctx.renderer.get_text_width(name, font_small)
+        ctx.renderer.add_text(page, name, sx - label_w // 2, flow_y + 30, font_small)
+
+    # Draw connecting line from Incomplete through all states
+    first_x = ctx.layout.content_left + state_spacing // 2 + 20
+    last_x = ctx.layout.content_left + state_spacing * 4 + state_spacing // 2 - 20
     page.draw_line(
-        fitz.Point(state_symbol_x, strike_y),
-        fitz.Point(state_desc_x + text_width, strike_y),
-        color=ctx.theme.black, width=1,
+        fitz.Point(first_x, flow_y),
+        fitz.Point(last_x, flow_y),
+        color=ctx.theme.gray,
+        width=1,
+        dashes="[4 4]",
+    )
+
+    y = flow_y + 75
+
+    # Signifiers section - larger cards
+    ctx.renderer.add_text(page, "Signifiers", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
+    title_w = ctx.renderer.get_text_width("Signifiers", ctx.typography.sizes["subheader"])
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left + title_w + 15, y + ctx.typography.sizes["subheader"] * 0.45),
+        fitz.Point(ctx.layout.content_right, y + ctx.typography.sizes["subheader"] * 0.45),
+        color=ctx.theme.gray,
+        width=0.5,
+    )
+    y += 30
+
+    signifier_intro = "Add context to any bullet by placing a signifier in front:"
+    ctx.renderer.add_text(page, signifier_intro, ctx.layout.content_left, y, font_small, ctx.theme.gray, italic=True)
+    y += 35
+
+    # Signifier cards - 3 columns, taller
+    sig_card_gap = 25
+    sig_card_width = (ctx.layout.content_width - sig_card_gap * 2) // 3
+    sig_card_height = 140
+    sig_padding = 20
+
+    signifiers = [
+        ("star", "Priority", "Important and urgent"),
+        ("lightbulb", "Inspiration", "Great idea worth remembering"),
+        ("eye", "Explore", "Requires further research"),
+    ]
+
+    for i, (icon_type, name, desc) in enumerate(signifiers):
+        sx = ctx.layout.content_left + (sig_card_width + sig_card_gap) * i
+        # Card
+        page.draw_rect(
+            fitz.Rect(sx, y, sx + sig_card_width, y + sig_card_height),
+            color=ctx.theme.gray,
+            width=0.5,
+        )
+        # Icon centered at top - larger
+        icon_cx = sx + sig_card_width // 2
+        icon_cy = y + sig_padding + 25
+        if icon_type == "star":
+            ctx.renderer.draw_star(page, icon_cx, icon_cy, 24)
+        elif icon_type == "lightbulb":
+            ctx.renderer.draw_lightbulb(page, icon_cx, icon_cy, 24)
+        elif icon_type == "eye":
+            ctx.renderer.draw_eye(page, icon_cx, icon_cy, 24)
+        # Name centered
+        name_w = ctx.renderer.get_text_width(name, font_section + 4)
+        ctx.renderer.add_text(page, name, icon_cx - name_w // 2, y + sig_padding + 60, font_section + 4)
+        # Description centered
+        desc_w = ctx.renderer.get_text_width(desc, font_small)
+        ctx.renderer.add_text(page, desc, icon_cx - desc_w // 2, y + sig_padding + 95, font_small, ctx.theme.gray)
+
+    y += sig_card_height + 35
+
+    # Footer note with more substance
+    custom_text = "Define your own signifiers as your practice evolves. Keep it minimal - too many symbols slow you down."
+    ctx.renderer.add_text(page, custom_text, ctx.layout.content_left, y, font_small, ctx.theme.gray, italic=True)
+    y += 40
+
+    # Key insight box - increased height and padding
+    insight_y = y
+    insight_height = 120
+    insight_padding = 25
+    page.draw_rect(
+        fitz.Rect(ctx.layout.content_left, insight_y, ctx.layout.content_right, insight_y + insight_height),
+        color=ctx.theme.gray,
+        width=0.5,
+    )
+    # Quote mark or title - more vertical padding
+    ctx.renderer.add_text(page, "The Core Insight", ctx.layout.content_left + insight_padding, insight_y + insight_padding, font_section + 2)
+    # Insight text - more spacing from title
+    insight_text = (
+        "The power of Bullet Journal lies not in the symbols, but in the reflection they encourage. "
+        "Every time you transform a bullet, you ask: does this still deserve my time and attention?"
+    )
+    ctx.renderer.draw_rich_text(
+        page, insight_text,
+        ctx.layout.content_left + insight_padding, insight_y + 60,
+        font_small + 1, ctx.layout.content_width - insight_padding * 2, 1.45
     )
 
 
 def generate_guide_set_up_logs(ctx: PageContext, page_idx: int) -> None:
+    """Generate Set up your logs page with elegant card-based layout."""
     page = ctx.renderer.doc[page_idx]
     font_body = 22
     font_small = 19
-    line_height = 1.35
+    font_section = 20
+    line_height = 1.45
+    card_padding = 20
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, "Set up your logs", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
 
-    y = ctx.layout.content_top + 95
-    get_started_x = ctx.layout.content_right - 110
+    # Calculate card dimensions to fill available space evenly
+    y_start = ctx.layout.content_top + 120
+    available_height = ctx.layout.content_bottom - y_start - 30
+    card_gap = 20
+    num_cards = 4
+    card_height = (available_height - card_gap * (num_cards - 1)) // num_cards
+    card_width = ctx.layout.content_width
 
-    ctx.renderer.add_text(page, "Future log", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    ctx.renderer.add_text(page, "Get started", get_started_x, y, font_small)
-    ctx.renderer.draw_arrow_right(page, ctx.layout.content_right - 15, y + font_small / 2, ctx.typography.arrow_size_small)
-    link_rect = (get_started_x - 5, y - 5, ctx.layout.content_right, y + font_small + 5)
-    ctx.renderer.links.add(page_idx, link_rect, ctx.page_map.future_log_start)
-    y += ctx.typography.subheader_spacing
+    # Log definitions with descriptions
+    logs = [
+        {
+            "name": "Future log",
+            "link_target": ctx.page_map.future_log_start,
+            "description": "The Future Log lets you see your future. Store |actions| and |events| that fall outside the current month. It provides an overview of your commitments over time.",
+            "columns": None,
+        },
+        {
+            "name": "Monthly log",
+            "link_target": ctx.page_map.monthly_start,
+            "description": "Two pages to reset, reprioritize, and recommit to what you allow into your life every month.",
+            "columns": [
+                ("Timeline", "Log events after they've happened. An accurate record of your life."),
+                ("Action Plan", "Organize and prioritize monthly |Tasks.| New tasks and Future Log items."),
+            ],
+        },
+        {
+            "name": "Weekly log",
+            "link_target": ctx.page_map.weekly_start,
+            "description": None,
+            "columns": [
+                ("Reflection", "Tidy entries. Acknowledge what moved you toward and away. Migrate relevant |Actions.|"),
+                ("Action plan", "Write only what you can get done this week. Number your top three priorities."),
+            ],
+        },
+        {
+            "name": "Daily log",
+            "link_target": ctx.page_map.daily_start,
+            "description": "Declutter your mind and stay focused. |Rapid Log| your thoughts as they bubble up. This is your main workspace - the heart of daily practice.",
+            "columns": None,
+        },
+    ]
 
-    future_text = (
-        "The Future Log lets you see your future. It is an outline of the life you're choosing to write. "
-        "The Future log is a |Collection| where you can store |actions| and |events| that fall outside the "
-        "current month. More than just being a type of calendar, the Future log also provides an "
-        "overview of your commitments over time."
-    )
-    height = ctx.renderer.draw_rich_text(page, future_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 30, line_height)
-    y += height + 10
+    y = y_start
+    for log in logs:
+        # Draw card border
+        page.draw_rect(
+            fitz.Rect(ctx.layout.content_left, y, ctx.layout.content_left + card_width, y + card_height),
+            color=ctx.theme.gray,
+            width=0.5,
+        )
 
-    page.draw_line(fitz.Point(ctx.layout.content_left, y), fitz.Point(ctx.layout.content_right, y), color=ctx.theme.black, width=0.5)
-    y += 15
+        # Log name with decorative line
+        name_y = y + card_padding
+        ctx.renderer.add_text(page, log["name"], ctx.layout.content_left + card_padding, name_y, ctx.typography.sizes["subheader"])
+        title_w = ctx.renderer.get_text_width(log["name"], ctx.typography.sizes["subheader"])
 
-    ctx.renderer.add_text(page, "Monthly log", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    ctx.renderer.add_text(page, "Get started", get_started_x, y, font_small)
-    ctx.renderer.draw_arrow_right(page, ctx.layout.content_right - 15, y + font_small / 2, ctx.typography.arrow_size_small)
-    link_rect = (get_started_x - 5, y - 5, ctx.layout.content_right, y + font_small + 5)
-    ctx.renderer.links.add(page_idx, link_rect, ctx.page_map.monthly_start)
-    y += ctx.typography.subheader_spacing
+        # Get started link at right side
+        get_started_text = "Get started"
+        get_started_w = ctx.renderer.get_text_width(get_started_text, font_small)
+        get_started_x = ctx.layout.content_right - card_padding - get_started_w - 25
+        ctx.renderer.add_text(page, get_started_text, get_started_x, name_y, font_small)
+        ctx.renderer.draw_arrow_right(page, ctx.layout.content_right - card_padding - 10, name_y + font_small / 2, ctx.typography.arrow_size_small)
 
-    monthly_intro = "Two pages to reset, reprioritize, and recommit to what you allow into your life every month."
-    height = ctx.renderer.draw_rich_text(page, monthly_intro, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 30, line_height)
-    y += height + 10
+        # Decorative line between title and "Get started"
+        line_start_x = ctx.layout.content_left + card_padding + title_w + 15
+        line_end_x = get_started_x - 20
+        page.draw_line(
+            fitz.Point(line_start_x, name_y + ctx.typography.sizes["subheader"] * 0.45),
+            fitz.Point(line_end_x, name_y + ctx.typography.sizes["subheader"] * 0.45),
+            color=ctx.theme.gray,
+            width=0.5,
+        )
 
-    col_width = (ctx.layout.content_width - 40) // 2
-    col1_x = ctx.layout.content_left
-    col2_x = ctx.layout.content_left + col_width + 25
+        # Link for entire header area
+        link_rect = (get_started_x - 5, name_y - 5, ctx.layout.content_right - card_padding, name_y + font_small + 10)
+        ctx.renderer.links.add(page_idx, link_rect, log["link_target"])
 
-    ctx.renderer.add_text(page, "Timeline", col1_x, y, font_body, italic=True)
-    ctx.renderer.add_text(page, "Action Plan", col2_x, y, font_body, italic=True)
-    y += font_body * 1.3
+        content_y = name_y + ctx.typography.sizes["subheader"] + 15
 
-    timeline_text = (
-        "The first page is your |Timeline.| Though it can be used as a traditional calendar "
-        "by adding upcoming events, it's recommended to use the Timeline to log "
-        "events after they've happened."
-    )
-    action_plan_text = (
-        "The next page is your Monthly |Action Plan.| It's designed to help you organize "
-        "and prioritize your monthly |Tasks.| It consists of new Tasks, Future Log items "
-        "scheduled for this month."
-    )
+        if log["description"]:
+            # Single description
+            ctx.renderer.draw_rich_text(
+                page, log["description"],
+                ctx.layout.content_left + card_padding, content_y,
+                font_body, card_width - card_padding * 2, line_height
+            )
 
-    h1 = ctx.renderer.draw_rich_text(page, timeline_text, col1_x, y, font_body, col_width - 10, line_height)
-    h2 = ctx.renderer.draw_rich_text(page, action_plan_text, col2_x, y, font_body, col_width - 10, line_height)
-    y += max(h1, h2) + 10
+        if log["columns"]:
+            # Two-column layout
+            col_gap = 30
+            col_width = (card_width - card_padding * 2 - col_gap) // 2
+            col1_x = ctx.layout.content_left + card_padding
+            col2_x = col1_x + col_width + col_gap
 
-    page.draw_line(fitz.Point(ctx.layout.content_left, y), fitz.Point(ctx.layout.content_right, y), color=ctx.theme.black, width=0.5)
-    y += 15
+            # If there's a description, start columns lower
+            if log["description"]:
+                content_y += font_body * line_height * 2 + 10
 
-    ctx.renderer.add_text(page, "Weekly log", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    ctx.renderer.add_text(page, "Get started", get_started_x, y, font_small)
-    ctx.renderer.draw_arrow_right(page, ctx.layout.content_right - 15, y + font_small / 2, ctx.typography.arrow_size_small)
-    link_rect = (get_started_x - 5, y - 5, ctx.layout.content_right, y + font_small + 5)
-    ctx.renderer.links.add(page_idx, link_rect, ctx.page_map.weekly_start)
-    y += ctx.typography.subheader_spacing
+            for i, (col_title, col_desc) in enumerate(log["columns"]):
+                col_x = col1_x if i == 0 else col2_x
+                # Column title (italic)
+                ctx.renderer.add_text(page, col_title, col_x, content_y, font_section, italic=True)
+                # Column description
+                ctx.renderer.draw_rich_text(
+                    page, col_desc,
+                    col_x, content_y + font_section * 1.3,
+                    font_small, col_width - 10, line_height
+                )
 
-    ctx.renderer.add_text(page, "Reflection", col1_x, y, font_body, italic=True)
-    ctx.renderer.add_text(page, "Action plan", col2_x, y, font_body, italic=True)
-    y += font_body * 1.3
-
-    reflection_text = (
-        "Tidy your weekly entries. Update the monthly timeline and action plan. "
-        "Acknowledge up to three things that moved you toward, and up to three "
-        "things that moved you away. Migrate only relevant |Actions| into the next week's Action Plan."
-    )
-    weekly_action_text = (
-        "Write down only what you can get done this week. Think of this as your weekly "
-        "commitments. If something is too big, break into smaller steps. When you're "
-        "done, number the top three things."
-    )
-
-    h1 = ctx.renderer.draw_rich_text(page, reflection_text, col1_x, y, font_body, col_width - 10, line_height)
-    h2 = ctx.renderer.draw_rich_text(page, weekly_action_text, col2_x, y, font_body, col_width - 10, line_height)
-    y += max(h1, h2) + 10
-
-    page.draw_line(fitz.Point(ctx.layout.content_left, y), fitz.Point(ctx.layout.content_right, y), color=ctx.theme.black, width=0.5)
-    y += 15
-
-    ctx.renderer.add_text(page, "Daily log", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    ctx.renderer.add_text(page, "Get started", get_started_x, y, font_small)
-    ctx.renderer.draw_arrow_right(page, ctx.layout.content_right - 15, y + font_small / 2, ctx.typography.arrow_size_small)
-    link_rect = (get_started_x - 5, y - 5, ctx.layout.content_right, y + font_small + 5)
-    ctx.renderer.links.add(page_idx, link_rect, ctx.page_map.daily_start)
-    y += ctx.typography.subheader_spacing
-
-    daily_text = (
-        "The Daily Log is designed to declutter your mind and keep you focused throughout the day. "
-        "|Rapid Log| your thoughts as they bubble up."
-    )
-    ctx.renderer.draw_rich_text(page, daily_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 30, line_height)
+        y += card_height + card_gap
 
 
 def generate_guide_practice(ctx: PageContext, page_idx: int) -> None:
+    """Generate The Practice page - T.A.M.E. framework with elegant card-based layout."""
     page = ctx.renderer.doc[page_idx]
-    font_body = 24
-    line_height = 1.5
+    font_body = 22
+    font_section = 20
+    font_small = 18
+    line_height = 1.45
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, "The Practice", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
 
     y = ctx.layout.content_top + 100
 
+    # Introduction - emphasizing N.A.M.E. -> T.A.M.E. cycle
     intro_text = (
-        "Writing things down is important, but it's only half of the equation. We can quickly "
-        "accumulate so much information that it's overwhelming. Reflection helps you slow down, "
-        "make sense of your experiences, and align with what truly matters. In the Bullet Journal "
-        "Method, reflection isn't about dwelling on the past--it's about learning from it to move "
-        "forward with clarity over and over again. It's a practice."
+        "|N.A.M.E.| captures your experiences. |T.A.M.E.| transforms them into clarity and action. "
+        "Recording feeds reflection; reflection guides recording. This cycle is the heart of the practice."
     )
-    height = ctx.renderer.draw_rich_text(page, intro_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 20
+    height = ctx.renderer.draw_rich_text(page, intro_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 20, line_height)
+    y += height + 30
 
-    name_text = (
-        "Rapid logging, the foundation of Bullet Journaling, lets you Record your experience by "
-        "|N.A.M.E.,| organizing it into |N|otes, |A|ctions, |M|oods, and |E|vents. Reflection builds on this "
-        "by helping you |T.A.M.E.| your Record, turning raw information into insights, and then "
-        "putting those insights into action."
+    # T.A.M.E. Section with decorative title
+    ctx.renderer.add_text(page, "T.A.M.E.", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
+    title_w = ctx.renderer.get_text_width("T.A.M.E.", ctx.typography.sizes["subheader"])
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left + title_w + 15, y + ctx.typography.sizes["subheader"] * 0.45),
+        fitz.Point(ctx.layout.content_right, y + ctx.typography.sizes["subheader"] * 0.45),
+        color=ctx.theme.gray,
+        width=0.5,
     )
-    height = ctx.renderer.draw_rich_text(page, name_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 25
+    y += 40
 
-    tame_intro = (
-        "|T.A.M.E.| is a step-by-step process for reflection, be it daily, weekly, or monthly. It helps you "
-        "make sense of your experiences and turn insights into action. Here's how it works:"
-    )
-    height = ctx.renderer.draw_rich_text(page, tame_intro, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 25
+    # Card layout - 2x2 grid with larger cards
+    card_gap = 25
+    card_width = (ctx.layout.content_width - card_gap) // 2
+    card_height = 165
+    card_padding = 22
 
-    tame_steps = [
-        ("1. T - Tidy", "your record. Cross off completed tasks, migrate unfinished ones, and declutter what no longer matters. This clears mental and physical space."),
-        ("2. A - Acknowledge", "your actions: Look back on what happened. Identify a few things that aligned with your intention and a few that didn't. For example, did a meeting help you focus on your goal, or did an unexpected distraction pull you off track?"),
-        ("3. M - Migrate", "what matters. Let go of what doesn't. Yes, this means rewriting open actions into the day, weekly, or the month where they will get done. It's about getting clear on what we're committing to in each stretch of time."),
-        ("4. E - Enact", "your insights into your Action plans. Set clear priorities for the next day, week, or month to stay on course."),
+    cards = [
+        ("T", "Tidy", "x", "Cross off completed tasks. Strike through what no longer matters. Clear space before moving forward."),
+        ("A", "Acknowledge", "updown", "Look back at what happened. Mark things that moved you toward or away from your goals."),
+        ("M", "Migrate", "arrow", "Carry forward what still matters. Rewriting confirms your commitment to each task."),
+        ("E", "Enact", "play", "Turn insights into action. Set clear priorities for the next day, week, or month."),
     ]
 
-    for step_title, step_desc in tame_steps:
-        ctx.renderer.add_text(page, step_title, ctx.layout.content_left + 20, y, font_body)
-        title_width = ctx.renderer.get_text_width(step_title, font_body)
-        height = ctx.renderer.draw_rich_text(
-            page,
-            step_desc,
-            ctx.layout.content_left + 25 + title_width,
-            y,
-            font_body,
-            ctx.layout.content_width - 65 - title_width,
-            line_height,
+    positions = [
+        (ctx.layout.content_left, y),
+        (ctx.layout.content_left + card_width + card_gap, y),
+        (ctx.layout.content_left, y + card_height + card_gap),
+        (ctx.layout.content_left + card_width + card_gap, y + card_height + card_gap),
+    ]
+
+    def draw_tame_symbol(sym_type: str, cx: float, cy: float, size: int = 20) -> None:
+        if sym_type == "x":
+            # X mark for Tidy (crossing off)
+            hs = size * 0.4
+            page.draw_line(fitz.Point(cx - hs, cy - hs), fitz.Point(cx + hs, cy + hs), color=ctx.theme.black, width=3)
+            page.draw_line(fitz.Point(cx - hs, cy + hs), fitz.Point(cx + hs, cy - hs), color=ctx.theme.black, width=3)
+        elif sym_type == "updown":
+            # Up and down arrows for Acknowledge (toward/away)
+            # Up arrow
+            page.draw_line(fitz.Point(cx - size * 0.2, cy - size * 0.15), fitz.Point(cx - size * 0.2, cy + size * 0.35), color=ctx.theme.black, width=2.5)
+            page.draw_line(fitz.Point(cx - size * 0.35, cy + size * 0.05), fitz.Point(cx - size * 0.2, cy - size * 0.25), color=ctx.theme.black, width=2.5)
+            page.draw_line(fitz.Point(cx - size * 0.05, cy + size * 0.05), fitz.Point(cx - size * 0.2, cy - size * 0.25), color=ctx.theme.black, width=2.5)
+            # Down arrow
+            page.draw_line(fitz.Point(cx + size * 0.2, cy - size * 0.35), fitz.Point(cx + size * 0.2, cy + size * 0.15), color=ctx.theme.black, width=2.5)
+            page.draw_line(fitz.Point(cx + size * 0.05, cy - size * 0.05), fitz.Point(cx + size * 0.2, cy + size * 0.25), color=ctx.theme.black, width=2.5)
+            page.draw_line(fitz.Point(cx + size * 0.35, cy - size * 0.05), fitz.Point(cx + size * 0.2, cy + size * 0.25), color=ctx.theme.black, width=2.5)
+        elif sym_type == "arrow":
+            # Forward arrow for Migrate
+            page.draw_line(fitz.Point(cx - size * 0.35, cy), fitz.Point(cx + size * 0.35, cy), color=ctx.theme.black, width=2.5)
+            page.draw_line(fitz.Point(cx + size * 0.1, cy - size * 0.3), fitz.Point(cx + size * 0.4, cy), color=ctx.theme.black, width=2.5)
+            page.draw_line(fitz.Point(cx + size * 0.1, cy + size * 0.3), fitz.Point(cx + size * 0.4, cy), color=ctx.theme.black, width=2.5)
+        elif sym_type == "play":
+            # Play/action triangle for Enact
+            pts = [
+                fitz.Point(cx - size * 0.25, cy - size * 0.35),
+                fitz.Point(cx - size * 0.25, cy + size * 0.35),
+                fitz.Point(cx + size * 0.35, cy),
+            ]
+            page.draw_polyline(pts + [pts[0]], color=ctx.theme.black, width=2.5, closePath=True)
+
+    for i, (letter, name, sym_type, desc) in enumerate(cards):
+        cx, cy = positions[i]
+        # Card border - subtle gray like The System page
+        page.draw_rect(
+            fitz.Rect(cx, cy, cx + card_width, cy + card_height),
+            color=ctx.theme.gray,
+            width=0.5,
         )
-        y += max(height, font_body * line_height) + 15
+        # Large letter
+        letter_x = cx + card_padding
+        letter_y = cy + card_padding
+        ctx.renderer.add_text(page, letter, letter_x, letter_y, 42)
+        # Symbol after letter
+        sym_x = letter_x + 55
+        sym_y = letter_y + 26
+        draw_tame_symbol(sym_type, sym_x, sym_y, 22)
+        # Name - adjusted position
+        ctx.renderer.add_text(page, name, cx + card_padding + 90, letter_y + 8, font_section + 2)
+        # Description - multi-line
+        ctx.renderer.draw_rich_text(page, desc, cx + card_padding, cy + card_padding + 60, font_small, card_width - card_padding * 2, 1.4)
 
+    y = positions[2][1] + card_height + 40
 
-def generate_guide_how_to_reflect(ctx: PageContext, page_idx: int) -> None:
-    page = ctx.renderer.doc[page_idx]
-    font_body = 24
-    line_height = 1.5
-
-    ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
-    ctx.renderer.add_text(page, "How to reflect", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
-
-    y = ctx.layout.content_top + 100
-
-    ctx.renderer.add_text(page, "Daily reflection", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    y += ctx.typography.subheader_spacing
-    daily_text = (
-        "Tidy your daily entries. Acknowledge up to three things that moved you toward, and up to "
-        "three things that moved you away, from the life you want/who you want to be, with an up "
-        "or down arrow next to the entry. Migrate: Identify what needs to be carried forward into "
-        "tomorrow's plan. Enact any daily insight by writing them down as actions."
+    # Reflection Rhythm section with decorative title
+    ctx.renderer.add_text(page, "Reflection Rhythm", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
+    title_w = ctx.renderer.get_text_width("Reflection Rhythm", ctx.typography.sizes["subheader"])
+    page.draw_line(
+        fitz.Point(ctx.layout.content_left + title_w + 15, y + ctx.typography.sizes["subheader"] * 0.45),
+        fitz.Point(ctx.layout.content_right, y + ctx.typography.sizes["subheader"] * 0.45),
+        color=ctx.theme.gray,
+        width=0.5,
     )
-    height = ctx.renderer.draw_rich_text(page, daily_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 25
+    y += 35
 
-    ctx.renderer.add_text(page, "Weekly reflection", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    y += ctx.typography.subheader_spacing
-    weekly_text = (
-        "Tidy your weekly entries. Update the monthly timeline and action plan. Acknowledge up "
-        "to three things that moved you toward, and up to three things that moved you away, from "
-        "the life you want/who you want to be, in a few sentences. Migrate only relevant |Actions| into "
-        "the next week's Action Plan. Enact any insight from your reflection into the action plan. "
-        "Prioritize your action plan based on your intention or insight. |Take action.|"
-    )
-    height = ctx.renderer.draw_rich_text(page, weekly_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
-    y += height + 25
+    font_rhythm = 20
+    rhythm_line_height = 1.5
 
-    ctx.renderer.add_text(page, "Monthly reflection", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
-    y += ctx.typography.subheader_spacing
-    monthly_text = (
-        "Tidy up your record for the last month. Acknowledge up to three things that moved you "
-        "toward, and up to three things that moved you away, from the life you want/who you want "
-        "to be, in short paragraphs. Migrate Actions that matter for the month ahead. Enact insights "
-        "from your reflection onto your monthly action plan. Prioritize your action plan based on "
-        "your intention or insight. |Take action.|"
-    )
-    ctx.renderer.draw_rich_text(page, monthly_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 40, line_height)
+    # Daily with digital hint
+    ctx.renderer.draw_rich_text(page, "|Daily:| Morning and evening - quick review and planning.", ctx.layout.content_left + 20, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
+    y += font_rhythm * rhythm_line_height + 5
+    ctx.renderer.add_text(page, "For deeper reflection, use a digital journal or note-taking app.", ctx.layout.content_left + 40, y, font_rhythm - 2, ctx.theme.gray, italic=True)
+    y += font_rhythm * rhythm_line_height + 10
+
+    # Weekly with new suggestion
+    height = ctx.renderer.draw_rich_text(page, "|Weekly:| Sunday evening - tidy the week, acknowledge progress.", ctx.layout.content_left + 20, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
+    y += height + 5
+    ctx.renderer.add_text(page, "Review what worked and what didn't. Adjust your approach for next week.", ctx.layout.content_left + 40, y, font_rhythm - 2, ctx.theme.gray, italic=True)
+    y += font_rhythm * rhythm_line_height + 10
+
+    # Monthly with digital hint
+    height = ctx.renderer.draw_rich_text(page, "|Monthly:| End of month - identify patterns, adjust direction.", ctx.layout.content_left + 20, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
+    y += height + 5
+    ctx.renderer.add_text(page, "Consider a longer writing session to explore what you've learned.", ctx.layout.content_left + 40, y, font_rhythm - 2, ctx.theme.gray, italic=True)
 
 
 def generate_guide_intention(ctx: PageContext, page_idx: int) -> None:
+    """Generate Intention page - minimalist design with maximum writing space."""
     page = ctx.renderer.doc[page_idx]
-    footer_font = 22
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, "Intention", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
 
+    # Maximize dot grid space - extend to just above footer
     grid_top = ctx.layout.content_top + 100
-    grid_bottom = ctx.layout.content_bottom - 160
+    grid_bottom = ctx.layout.target_height - 70  # Leave space for footer
     ctx.renderer.draw_dot_grid(page, grid_top, grid_bottom)
 
-    footer_y = ctx.layout.content_bottom - 140
-    page.draw_line(
-        fitz.Point(ctx.layout.content_left, footer_y),
-        fitz.Point(ctx.layout.content_right, footer_y),
-        color=ctx.theme.black,
-        width=0.5,
-    )
-    footer_y += 15
-
-    ctx.renderer.draw_lightning(page, ctx.layout.content_left, footer_y + 5, scale=1.8)
-
-    footer_text = (
-        "An intention is a commitment to a process. Intentions bring meaning into our lives now, so that we "
-        "can navigate our lives based on what it is as opposed to what may be. They're powerful tools that we "
-        "can use to instantly direct our focus for as long as we need. We set an intention to use as our compass."
-    )
-    ctx.renderer.draw_rich_text(page, footer_text, ctx.layout.content_left + 45, footer_y, footer_font, ctx.layout.content_width - 75, 1.4)
+    # Unified footer section
+    ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["intention"])
 
 
 def generate_guide_goals(ctx: PageContext, page_idx: int) -> None:
+    """Generate Goals page - minimalist design with maximum writing space."""
     page = ctx.renderer.doc[page_idx]
-    footer_font = 22
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, "Goals", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
 
+    # Maximize dot grid space - extend to just above footer
     grid_top = ctx.layout.content_top + 100
-    grid_bottom = ctx.layout.content_bottom - 160
+    grid_bottom = ctx.layout.target_height - 70  # Leave space for footer
     ctx.renderer.draw_dot_grid(page, grid_top, grid_bottom)
 
-    footer_y = ctx.layout.content_bottom - 140
-    page.draw_line(
-        fitz.Point(ctx.layout.content_left, footer_y),
-        fitz.Point(ctx.layout.content_right, footer_y),
-        color=ctx.theme.black,
-        width=0.5,
-    )
-    footer_y += 15
-
-    ctx.renderer.draw_lightning(page, ctx.layout.content_left, footer_y + 5, scale=1.8)
-
-    footer_text = (
-        "A goal is the definition of an outcome. Goals help us articulate what we want, transforming ephemeral "
-        "desires into tangible targets, lofty dreams into fixed destinations. Taking time to carefully define our "
-        "destinations, can provide a much needed sense of purpose and direction."
-    )
-    ctx.renderer.draw_rich_text(page, footer_text, ctx.layout.content_left + 45, footer_y, footer_font, ctx.layout.content_width - 75, 1.4)
+    # Unified footer section
+    ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["goals"])
 
 
 def generate_future_log(ctx: PageContext, page_idx: int, quarter: int) -> None:
@@ -703,13 +1113,18 @@ def generate_future_log(ctx: PageContext, page_idx: int, quarter: int) -> None:
     start_idx = (quarter - 1) * 3
     months = ctx.calendar.months[start_idx:start_idx + 3]
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.content_bottom - 130)
+    # Extend dot grid to just above footer (footer starts at target_height - 55)
+    grid_start_y = ctx.layout.content_top + 115
+    grid_end_y = ctx.layout.target_height - 70
 
-    y = ctx.layout.content_top + 115
-    month_height = (ctx.layout.content_height - 265) // 3
+    ctx.renderer.draw_dot_grid(page, grid_start_y, grid_end_y)
+
+    # Distribute available space evenly among 3 months
+    available_height = grid_end_y - grid_start_y
+    month_height = available_height // 3
 
     for i, month in enumerate(months):
-        my = y + i * month_height
+        my = grid_start_y + i * month_height
         ctx.renderer.add_text(page, month.name, ctx.layout.content_left, my, ctx.typography.sizes["body"])
         page.draw_line(
             fitz.Point(ctx.layout.content_left, my + 45),
@@ -728,13 +1143,18 @@ def generate_monthly_timeline(ctx: PageContext, page_idx: int, month_idx: int) -
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, month.name, ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.content_bottom - 130)
+    # Extend dot grid to just above footer
+    grid_start_y = ctx.layout.content_top + 115
+    grid_end_y = ctx.layout.target_height - 70
 
-    y = ctx.layout.content_top + 115
-    day_height = (ctx.layout.content_height - 265) / month.days
+    ctx.renderer.draw_dot_grid(page, grid_start_y, grid_end_y)
+
+    # Distribute day numbers evenly in available height
+    available_height = grid_end_y - grid_start_y
+    day_height = available_height / month.days
 
     for day in range(1, month.days + 1):
-        day_y = y + (day - 1) * day_height + ctx.typography.sizes["day_number"] / 2
+        day_y = grid_start_y + (day - 1) * day_height + ctx.typography.sizes["day_number"] / 2
         ctx.renderer.add_text(page, str(day), ctx.layout.content_left, day_y, ctx.typography.sizes["day_number"])
 
         day_of_year = ctx.calendar.day_of_year(month_idx, day)
@@ -758,7 +1178,8 @@ def generate_monthly_action_plan(ctx: PageContext, page_idx: int, month_idx: int
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, month.name, ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.content_bottom - 130)
+    # Extend dot grid to just above footer
+    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.target_height - 70)
 
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["monthly_action"])
 
@@ -815,7 +1236,8 @@ def generate_weekly_action_plan(ctx: PageContext, page_idx: int) -> None:
 
     draw_date_range_input(ctx, page, ctx.layout.content_right - 220, ctx.layout.content_top + 55, 22)
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.content_bottom - 130)
+    # Extend dot grid to just above footer
+    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.target_height - 70)
 
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["weekly_action"])
 
@@ -828,7 +1250,8 @@ def generate_weekly_reflection(ctx: PageContext, page_idx: int) -> None:
 
     draw_date_range_input(ctx, page, ctx.layout.content_right - 220, ctx.layout.content_top + 55, 22)
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.content_bottom - 130)
+    # Extend dot grid to just above footer
+    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.target_height - 70)
 
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["weekly_reflection"])
 
@@ -838,6 +1261,12 @@ def generate_daily_log(ctx: PageContext, page_idx: int, month_idx: int, day: int
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.year_index, ctx.layout.content_left, ctx.layout.content_top + 5)
 
+    week_num = ctx.calendar.week_of_date(month_idx, day)
+    week_label = f"W{week_num}"
+    week_page = ctx.page_map.weekly_action(week_num - 1)
+    week_x = ctx.layout.content_left + 80
+    ctx.renderer.add_nav_link(page_idx, week_label, week_page, week_x, ctx.layout.content_top + 5)
+
     month_name = ctx.calendar.months[month_idx].name
     monthly_page = ctx.page_map.month_timeline(month_idx)
     monthly_text_width = ctx.renderer.get_text_width(month_name, ctx.typography.sizes["nav"])
@@ -852,7 +1281,8 @@ def generate_daily_log(ctx: PageContext, page_idx: int, month_idx: int, day: int
     date_label = ctx.calendar.date_label(month_idx, day)
     ctx.renderer.add_text(page, date_label, ctx.layout.content_left, ctx.layout.content_top + 70, ctx.typography.sizes["title_page"])
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 145, ctx.layout.content_bottom - 130)
+    # Extend dot grid to just above footer
+    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 145, ctx.layout.target_height - 70)
 
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["daily_log"])
 
@@ -862,6 +1292,12 @@ def generate_daily_log_continuation(ctx: PageContext, page_idx: int, month_idx: 
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.year_index, ctx.layout.content_left, ctx.layout.content_top + 5)
 
+    week_num = ctx.calendar.week_of_date(month_idx, day)
+    week_label = f"W{week_num}"
+    week_page = ctx.page_map.weekly_action(week_num - 1)
+    week_x = ctx.layout.content_left + 80
+    ctx.renderer.add_nav_link(page_idx, week_label, week_page, week_x, ctx.layout.content_top + 5)
+
     month_name = ctx.calendar.months[month_idx].name
     monthly_page = ctx.page_map.month_timeline(month_idx)
     monthly_text_width = ctx.renderer.get_text_width(month_name, ctx.typography.sizes["nav"])
@@ -876,7 +1312,8 @@ def generate_daily_log_continuation(ctx: PageContext, page_idx: int, month_idx: 
     date_label = ctx.calendar.date_label(month_idx, day)
     ctx.renderer.add_text(page, date_label, ctx.layout.content_left, ctx.layout.content_top + 70, ctx.typography.sizes["title_page"])
 
-    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 145, ctx.layout.content_bottom - 30)
+    # Continuation pages have no footer, extend grid closer to bottom
+    ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 145, ctx.layout.target_height - 50)
 
 
 def generate_collection_page(ctx: PageContext, page_idx: int, index_page_idx: int) -> None:
