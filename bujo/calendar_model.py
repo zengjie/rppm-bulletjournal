@@ -49,3 +49,8 @@ class CalendarModel:
 
     def date_label(self, month_idx: int, day: int) -> str:
         return f"{self.months[month_idx].abbrev} {day}"
+
+    def week_of_date(self, month_idx: int, day: int) -> int:
+        """Return the ISO week number (1-based) for a given month and day."""
+        d = date(self.year, month_idx + 1, day)
+        return d.isocalendar().week

@@ -191,6 +191,64 @@ class Renderer:
         shape.finish(fill=self.theme.white, closePath=True)
         shape.commit()
 
+    def draw_star(self, page: fitz.Page, x: float, y: float, size: float = 12, color=None) -> None:
+        """Draw a five-pointed star (priority signifier)."""
+        if color is None:
+            color = self.theme.black
+        import math
+        points = []
+        for i in range(5):
+            outer_angle = math.radians(-90 + i * 72)
+            points.append((
+                x + size * math.cos(outer_angle),
+                y + size * math.sin(outer_angle)
+            ))
+            inner_angle = math.radians(-90 + i * 72 + 36)
+            points.append((
+                x + size * 0.38 * math.cos(inner_angle),
+                y + size * 0.38 * math.sin(inner_angle)
+            ))
+        fitz_points = [fitz.Point(px, py) for px, py in points]
+        page.draw_polyline(fitz_points, color=color, fill=color, closePath=True)
+
+    def draw_lightbulb(self, page: fitz.Page, x: float, y: float, size: float = 12, color=None) -> None:
+        """Draw a simple hand-drawn style lightbulb icon - clearer design."""
+        if color is None:
+            color = self.theme.black
+        stroke = 2.0
+        # Main bulb - larger and more centered
+        r = size * 0.5
+        bulb_center_y = y - r * 0.3
+        page.draw_circle(fitz.Point(x, bulb_center_y), r, color=color, width=stroke)
+        # Neck/base - narrower and shorter
+        neck_w = r * 0.5
+        neck_top = bulb_center_y + r * 0.9
+        neck_bot = bulb_center_y + r * 1.3
+        page.draw_line(fitz.Point(x - neck_w, neck_top), fitz.Point(x - neck_w * 0.7, neck_bot), color=color, width=stroke)
+        page.draw_line(fitz.Point(x + neck_w, neck_top), fitz.Point(x + neck_w * 0.7, neck_bot), color=color, width=stroke)
+        page.draw_line(fitz.Point(x - neck_w * 0.7, neck_bot), fitz.Point(x + neck_w * 0.7, neck_bot), color=color, width=stroke)
+        # Filament lines inside bulb for clarity
+        filament_y = bulb_center_y + r * 0.1
+        filament_w = r * 0.35
+        page.draw_line(fitz.Point(x - filament_w, filament_y), fitz.Point(x, filament_y - r * 0.3), color=color, width=stroke * 0.7)
+        page.draw_line(fitz.Point(x, filament_y - r * 0.3), fitz.Point(x + filament_w, filament_y), color=color, width=stroke * 0.7)
+
+    def draw_eye(self, page: fitz.Page, x: float, y: float, size: float = 12, color=None) -> None:
+        """Draw a simple hand-drawn style eye icon."""
+        if color is None:
+            color = self.theme.black
+        stroke = 1.8
+        w = size * 0.9
+        h = size * 0.45
+        page.draw_line(fitz.Point(x - w, y), fitz.Point(x - w * 0.3, y - h), color=color, width=stroke)
+        page.draw_line(fitz.Point(x - w * 0.3, y - h), fitz.Point(x + w * 0.3, y - h), color=color, width=stroke)
+        page.draw_line(fitz.Point(x + w * 0.3, y - h), fitz.Point(x + w, y), color=color, width=stroke)
+        page.draw_line(fitz.Point(x - w, y), fitz.Point(x - w * 0.3, y + h), color=color, width=stroke)
+        page.draw_line(fitz.Point(x - w * 0.3, y + h), fitz.Point(x + w * 0.3, y + h), color=color, width=stroke)
+        page.draw_line(fitz.Point(x + w * 0.3, y + h), fitz.Point(x + w, y), color=color, width=stroke)
+        pupil_r = size * 0.2
+        page.draw_circle(fitz.Point(x, y), pupil_r, color=color, fill=color)
+
     def draw_arrow_right(self, page: fitz.Page, x: float, y: float, size: float, color=None) -> None:
         if color is None:
             color = self.theme.black
@@ -244,21 +302,32 @@ class Renderer:
         )
 
     def draw_footer_section(self, page: fitz.Page, footer_text: str) -> None:
-        y = self.layout.content_bottom - 125
+        """Draw a compact footer section with gray divider line and lightning icon."""
+        # Compact layout - position from actual page bottom, not content_bottom
+        # Footer needs ~45px: divider line + 8px gap + text/icon (~36px)
+        line_y = self.layout.target_height - 55
+        text_y = line_y + 8
+
+        # Gray divider line
         page.draw_line(
-            fitz.Point(self.layout.content_left, y - 15),
-            fitz.Point(self.layout.content_right, y - 15),
-            color=self.theme.black,
+            fitz.Point(self.layout.content_left, line_y),
+            fitz.Point(self.layout.content_right, line_y),
+            color=self.theme.gray,
             width=0.5,
         )
-        self.draw_lightning(page, self.layout.content_left, y + 5, scale=1.8)
-        self.draw_rich_text(
+
+        # Smaller lightning icon
+        self.draw_lightning(page, self.layout.content_left, text_y + 2, scale=1.4)
+
+        # Footer text in gray - strip rich text markers for simple rendering
+        plain_text = footer_text.replace("|", "")
+        self.add_text(
             page,
-            footer_text,
-            self.layout.content_left + 45,
-            y,
-            font_size=self.typography.sizes["footer"],
-            max_width=self.layout.content_width - 75,
+            plain_text,
+            self.layout.content_left + 30,
+            text_y,
+            font_size=self.typography.sizes["footer"] - 2,
+            color=self.theme.gray,
         )
 
     def add_nav_link(
