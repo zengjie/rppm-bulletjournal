@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
-
 import fitz
 
 from bujo.calendar_model import CalendarModel
@@ -13,6 +11,8 @@ from .primitives import Renderer
 
 FOOTER_TEXTS = {
     "daily_log": "Rapid log your thoughts as they bubble up.",
+    "daily_log_week_end": "End of week: time to reflect and migrate.",
+    "daily_log_month_end": "End of month: review, reflect, and plan ahead.",
     "weekly_action": "Write only what you can get done this week.",
     "weekly_reflection": "Tidy, acknowledge, migrate, enact.",
     "collection_index": "Organize related information by topic.",
@@ -112,9 +112,17 @@ def generate_main_index(ctx: PageContext, page_idx: int) -> None:
     available_height = ctx.layout.content_bottom - y - 20
     month_row_height = available_height // 12
 
-    week_starts = [1, 6, 10, 14, 19, 23, 27, 32, 36, 40, 45, 49]
-    week_area_width = ctx.layout.content_right - week_col_start
-    week_num_width = 95
+    # Get weeks grouped by their primary month (based on majority of days)
+    weeks_by_month = ctx.calendar.compute_weeks_by_month()
+
+    # Calculate dynamic week cell width based on max weeks in any month
+    max_weeks_per_month = max(len(weeks) for weeks in weeks_by_month)
+    available_week_width = ctx.layout.content_right - week_col_start
+    week_cell_width = available_week_width // max_weeks_per_month
+
+    # Track vertical separator position
+    sep_x = week_col_start - 25
+    sep_y_start = y
 
     for month_idx in range(12):
         month = ctx.calendar.months[month_idx]
@@ -134,30 +142,32 @@ def generate_main_index(ctx: PageContext, page_idx: int) -> None:
         )
         ctx.renderer.links.add(page_idx, month_link_rect, month_page)
 
-        sep_x = week_col_start - 25
-        page.draw_line(
-            fitz.Point(sep_x, y),
-            fitz.Point(sep_x, y + month_row_height - 12),
-            color=ctx.theme.line,
-            width=0.5,
-        )
-
-        week_start = week_starts[month_idx]
-        week_end = week_starts[month_idx + 1] if month_idx < 11 else ctx.calendar.weeks_in_year + 1
-
-        for i, w in enumerate(range(week_start, week_end)):
+        # Display weeks that primarily belong to this month
+        month_weeks = weeks_by_month[month_idx]
+        font_size = ctx.typography.sizes["small"]
+        for i, w in enumerate(month_weeks):
             week_page = ctx.page_map.weekly_action(w - 1)
-            week_x = week_col_start + i * week_num_width
 
-            ctx.renderer.add_text(page, str(w), week_x, text_y, ctx.typography.sizes["small"])
-            week_arrow_x = week_x + 30
-            week_arrow_y = text_y + ctx.typography.sizes["small"] * 0.65
+            # Calculate centered position for week label + arrow within cell
+            week_label = f"W{w}"
+            label_width = ctx.renderer.get_text_width(week_label, font_size)
+            arrow_width = ctx.typography.arrow_size_small + 5
+            total_content_width = label_width + arrow_width
+            cell_start = week_col_start + i * week_cell_width
+            cell_center_offset = (week_cell_width - total_content_width) / 2
+            week_x = cell_start + cell_center_offset
+
+            ctx.renderer.add_text(page, week_label, week_x, text_y, font_size)
+            week_arrow_x = week_x + label_width + 5
+            week_arrow_y = text_y + font_size * 0.65
             ctx.renderer.draw_arrow_right(page, week_arrow_x, week_arrow_y, ctx.typography.arrow_size_small)
+
+            # Clickable rect covers entire cell for easy tapping
             week_link_rect = (
-                week_x - 5,
-                text_y - 5,
-                week_x + week_num_width - 5,
-                text_y + ctx.typography.sizes["small"] + 5,
+                cell_start,
+                text_y - 10,
+                cell_start + week_cell_width,
+                text_y + font_size + 10,
             )
             ctx.renderer.links.add(page_idx, week_link_rect, week_page)
 
@@ -169,6 +179,15 @@ def generate_main_index(ctx: PageContext, page_idx: int) -> None:
             width=0.5,
         )
         y += month_row_height
+
+    # Draw single continuous vertical separator between months and weeks
+    sep_y_end = y - 12
+    page.draw_line(
+        fitz.Point(sep_x, sep_y_start),
+        fitz.Point(sep_x, sep_y_end),
+        color=ctx.theme.line,
+        width=0.5,
+    )
 
 
 def generate_year_index(ctx: PageContext, page_idx: int) -> None:
@@ -241,8 +260,12 @@ def generate_collection_index(ctx: PageContext, page_idx: int, letter: str) -> N
     ctx.renderer.add_text(page, f"Index {letter}", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
 
     y = ctx.layout.content_top + 130
-    line_spacing = 60
     num_lines = ctx.settings.num_collections_per_index
+
+    # Calculate dynamic line spacing to utilize available space
+    footer_margin = 70
+    available_height = ctx.layout.content_bottom - footer_margin - y
+    line_spacing = available_height // num_lines
 
     collection_offset = 0 if letter == "C" else ctx.settings.num_collections_per_index
 
@@ -261,7 +284,8 @@ def generate_collection_index(ctx: PageContext, page_idx: int, letter: str) -> N
 
         collection_idx = collection_offset + i
         collection_page = ctx.page_map.collection_page(collection_idx)
-        link_rect = (arrow_x - 15, arrow_y - 15, ctx.layout.content_right, arrow_y + 15)
+        # Make entire row clickable
+        link_rect = (ctx.layout.content_left, line_y, ctx.layout.content_right, line_y + line_spacing)
         ctx.renderer.links.add(page_idx, link_rect, collection_page)
 
     bottom_line_y = y + num_lines * line_spacing
@@ -278,9 +302,9 @@ def generate_collection_index(ctx: PageContext, page_idx: int, letter: str) -> N
 def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     """Generate Symbol Reference page - quick reference for all symbols with elegant design."""
     page = ctx.renderer.doc[page_idx]
-    font_header = 28
-    font_section = 22
-    font_desc = 22
+    font_header = 35
+    font_section = 28
+    font_desc = 28
     line_height = 1.8
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
@@ -432,7 +456,7 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
 
     # Scenario subtitle
     subtitle_y = example_start_y + 50
-    ctx.renderer.add_text(page, "Planning a Surprise Party", ctx.layout.content_left, subtitle_y, font_section, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "Planning a Surprise Party", ctx.layout.content_left, subtitle_y, font_section, italic=True)
 
     # Calculate row parameters to fill available space
     header_y = subtitle_y + 50
@@ -440,9 +464,9 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     row_area_height = available_height - (header_y - example_start_y) - 50
     line_h = row_area_height // num_rows  # Dynamic row height
 
-    # Font sizes - larger for better fill
+    # Font sizes - keep original for example section
     font_hw = 34
-    font_note = 16
+    font_note = 19
 
     # Two-column layout
     col_gap = 50
@@ -514,7 +538,7 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     draw_ex_dot(left_x + name_col, sym_y)
     ctx.renderer.add_text(page, "Book venue", left_x + text_col, example_y, font_hw, italic=True)
     draw_ex_x(right_col_x + 3, sym_y)
-    ctx.renderer.add_text(page, "completed", right_col_x + 28, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "completed", right_col_x + 28, example_y + 10, font_note, italic=True)
     example_y += line_h
 
     # Row 2: Action -> Migrated
@@ -522,7 +546,7 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     draw_ex_dot(left_x + name_col, sym_y)
     ctx.renderer.add_text(page, "Order cake", left_x + text_col, example_y, font_hw, italic=True)
     draw_ex_migrate(right_col_x, sym_y)
-    ctx.renderer.add_text(page, "moved to tomorrow", right_col_x + 28, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "moved to tomorrow", right_col_x + 28, example_y + 10, font_note, italic=True)
     example_y += line_h
 
     # Row 3: Action -> Scheduled
@@ -530,7 +554,7 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     draw_ex_dot(left_x + name_col, sym_y)
     ctx.renderer.add_text(page, "Buy balloons", left_x + text_col, example_y, font_hw, italic=True)
     draw_ex_schedule(right_col_x, sym_y)
-    ctx.renderer.add_text(page, "scheduled to Friday", right_col_x + 28, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "scheduled to Friday", right_col_x + 28, example_y + 10, font_note, italic=True)
     example_y += line_h
 
     # Row 4: Action -> Irrelevant
@@ -541,7 +565,7 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     ctx.renderer.add_text(page, striketext, right_col_x, example_y, font_hw, italic=True)
     strike_w = ctx.renderer.get_text_width(striketext, font_hw)
     page.draw_line(fitz.Point(right_col_x, sym_y), fitz.Point(right_col_x + strike_w, sym_y), color=ctx.theme.black, width=1.5)
-    ctx.renderer.add_text(page, "use group chat", right_col_x + strike_w + 15, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "use group chat", right_col_x + strike_w + 15, example_y + 10, font_note, italic=True)
     example_y += line_h
 
     # Row 5: Explore Note -> spawns new action
@@ -551,7 +575,7 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     ctx.renderer.add_text(page, "Music options?", left_x + text_col, example_y, font_hw, italic=True)
     draw_ex_dot(right_col_x + 3, sym_y)
     ctx.renderer.add_text(page, "Ask Tom for playlist", right_col_x + 28, example_y, font_hw, italic=True)
-    ctx.renderer.add_text(page, "new action", right_col_x + 28, example_y + font_hw * 0.95, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "new action", right_col_x + 28, example_y + font_hw * 0.95, font_note, italic=True)
     example_y += line_h
 
     # Row 6: Inspiration Note -> unchanged
@@ -559,14 +583,14 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     ctx.renderer.draw_lightbulb(page, left_x + sig_col + 10, sym_y, 14)
     draw_ex_dash(left_x + name_col, sym_y)
     ctx.renderer.add_text(page, "80s theme!", left_x + text_col, example_y, font_hw, italic=True)
-    ctx.renderer.add_text(page, "(unchanged)", right_col_x, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "(unchanged)", right_col_x, example_y + 10, font_note, italic=True)
     example_y += line_h
 
     # Row 7: Event -> immutable
     sym_y = example_y + font_hw * 0.5
     draw_ex_circle(left_x + name_col - 3, sym_y)
     ctx.renderer.add_text(page, "Party 6pm", left_x + text_col, example_y, font_hw, italic=True)
-    ctx.renderer.add_text(page, "(events are facts)", right_col_x, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "(events are facts)", right_col_x, example_y + 10, font_note, italic=True)
     example_y += line_h
 
     # Row 8: Mood -> acknowledge marker
@@ -574,19 +598,21 @@ def generate_guide_symbol_reference(ctx: PageContext, page_idx: int) -> None:
     draw_ex_double(left_x + name_col - 3, sym_y)
     ctx.renderer.add_text(page, "Nervous", left_x + text_col, example_y, font_hw, italic=True)
     ctx.renderer.add_text(page, "^", right_col_x + 6, example_y, font_hw, italic=True)
-    ctx.renderer.add_text(page, "moved toward my goal", right_col_x + 35, example_y + 10, font_note, ctx.theme.gray, italic=True)
+    ctx.renderer.add_text(page, "moved toward my goal", right_col_x + 35, example_y + 10, font_note, italic=True)
 
 
 def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
     """Generate The System page - elegant card-based layout for N.A.M.E. framework."""
     page = ctx.renderer.doc[page_idx]
-    font_body = 22
-    font_section = 20
-    font_small = 18
+    font_body = 28
+    font_section = 25
+    font_small = 25
     line_height = 1.45
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
     ctx.renderer.add_text(page, "The System", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["header"])
+
+    # Layout uses dynamic sizing to fill available space evenly
 
     y = ctx.layout.content_top + 100
 
@@ -596,7 +622,7 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         "Use |Rapid Logging| to capture thoughts quickly with minimal syntax."
     )
     height = ctx.renderer.draw_rich_text(page, intro_text, ctx.layout.content_left, y, font_body, ctx.layout.content_width - 20, line_height)
-    y += height + 30
+    y += height + 35
 
     # N.A.M.E. Section with decorative title
     ctx.renderer.add_text(page, "N.A.M.E.", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
@@ -607,13 +633,13 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         color=ctx.theme.gray,
         width=0.5,
     )
-    y += 40
+    y += 45
 
     # N.A.M.E. cards - 2x2 grid with larger cards
-    card_gap = 25
+    card_gap = 22
     card_width = (ctx.layout.content_width - card_gap) // 2
-    card_height = 160
-    card_padding = 22
+    card_height = 168  # Increased from 150
+    card_padding = 22  # Increased from 18
 
     name_items = [
         ("N", "Notes", "dash", "Ideas, insights, information to remember. Capture what you learn."),
@@ -658,10 +684,10 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         draw_symbol(sym_type, sym_x, sym_y, 22)
         # Name - adjusted position for new symbol spacing
         ctx.renderer.add_text(page, name, cx + card_padding + 90, letter_y + 8, font_section + 2)
-        # Description - multi-line
-        ctx.renderer.draw_rich_text(page, desc, cx + card_padding, cy + card_padding + 60, font_small, card_width - card_padding * 2, 1.4)
+        # Description - multi-line with more vertical space
+        ctx.renderer.draw_rich_text(page, desc, cx + card_padding, cy + card_padding + 68, font_small, card_width - card_padding * 2, 1.5)
 
-    y = positions[2][1] + card_height + 40
+    y = positions[2][1] + card_height + 38
 
     # Action States - horizontal flow with clearer design
     ctx.renderer.add_text(page, "Action States", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
@@ -672,15 +698,15 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         color=ctx.theme.gray,
         width=0.5,
     )
-    y += 30
+    y += 32
 
     # Explanation text
     action_intro = "A dot can transform to reflect multiple states. Each transformation is a moment of reflection."
-    ctx.renderer.add_text(page, action_intro, ctx.layout.content_left, y, font_small, ctx.theme.gray, italic=True)
-    y += 35
+    ctx.renderer.add_text(page, action_intro, ctx.layout.content_left, y, font_small, italic=True)
+    y += 38
 
     # Flow diagram - 5 states in a row
-    flow_y = y + 30
+    flow_y = y + 28
     state_spacing = ctx.layout.content_width // 5
     states = [
         ("Incomplete", "dot"),
@@ -713,9 +739,9 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         sx = ctx.layout.content_left + state_spacing * i + state_spacing // 2
         # Symbol
         draw_state_symbol(sym_type, sx, flow_y, 16)
-        # Label below
+        # Label below with more space
         label_w = ctx.renderer.get_text_width(name, font_small)
-        ctx.renderer.add_text(page, name, sx - label_w // 2, flow_y + 30, font_small)
+        ctx.renderer.add_text(page, name, sx - label_w // 2, flow_y + 35, font_small)
 
     # Draw connecting line from Incomplete through all states
     first_x = ctx.layout.content_left + state_spacing // 2 + 20
@@ -728,9 +754,9 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         dashes="[4 4]",
     )
 
-    y = flow_y + 75
+    y = flow_y + 95
 
-    # Signifiers section - larger cards
+    # Signifiers section
     ctx.renderer.add_text(page, "Signifiers", ctx.layout.content_left, y, ctx.typography.sizes["subheader"])
     title_w = ctx.renderer.get_text_width("Signifiers", ctx.typography.sizes["subheader"])
     page.draw_line(
@@ -739,17 +765,17 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
         color=ctx.theme.gray,
         width=0.5,
     )
-    y += 30
+    y += 36
 
     signifier_intro = "Add context to any bullet by placing a signifier in front:"
-    ctx.renderer.add_text(page, signifier_intro, ctx.layout.content_left, y, font_small, ctx.theme.gray, italic=True)
-    y += 35
+    ctx.renderer.add_text(page, signifier_intro, ctx.layout.content_left, y, font_small, italic=True)
+    y += 45
 
-    # Signifier cards - 3 columns, taller
-    sig_card_gap = 25
+    # Signifier cards - 3 columns with larger cards
+    sig_card_gap = 28
     sig_card_width = (ctx.layout.content_width - sig_card_gap * 2) // 3
-    sig_card_height = 140
-    sig_padding = 20
+    sig_card_height = 165  # Increased from 145
+    sig_padding = 24  # Increased from 20
 
     signifiers = [
         ("star", "Priority", "Important and urgent"),
@@ -765,58 +791,59 @@ def generate_guide_system(ctx: PageContext, page_idx: int) -> None:
             color=ctx.theme.gray,
             width=0.5,
         )
-        # Icon centered at top - larger
+        # Icon centered at top
         icon_cx = sx + sig_card_width // 2
-        icon_cy = y + sig_padding + 25
+        icon_cy = y + sig_padding + 32
         if icon_type == "star":
-            ctx.renderer.draw_star(page, icon_cx, icon_cy, 24)
+            ctx.renderer.draw_star(page, icon_cx, icon_cy, 26)
         elif icon_type == "lightbulb":
-            ctx.renderer.draw_lightbulb(page, icon_cx, icon_cy, 24)
+            ctx.renderer.draw_lightbulb(page, icon_cx, icon_cy, 26)
         elif icon_type == "eye":
-            ctx.renderer.draw_eye(page, icon_cx, icon_cy, 24)
-        # Name centered
-        name_w = ctx.renderer.get_text_width(name, font_section + 4)
-        ctx.renderer.add_text(page, name, icon_cx - name_w // 2, y + sig_padding + 60, font_section + 4)
+            ctx.renderer.draw_eye(page, icon_cx, icon_cy, 26)
+        # Name centered with more space
+        name_w = ctx.renderer.get_text_width(name, font_section + 2)
+        ctx.renderer.add_text(page, name, icon_cx - name_w // 2, y + sig_padding + 72, font_section + 2)
         # Description centered
-        desc_w = ctx.renderer.get_text_width(desc, font_small)
-        ctx.renderer.add_text(page, desc, icon_cx - desc_w // 2, y + sig_padding + 95, font_small, ctx.theme.gray)
+        desc_w = ctx.renderer.get_text_width(desc, font_small - 2)
+        ctx.renderer.add_text(page, desc, icon_cx - desc_w // 2, y + sig_padding + 112, font_small - 2)
 
-    y += sig_card_height + 35
+    y += sig_card_height + 40
 
-    # Footer note with more substance
+    # Footer note
     custom_text = "Define your own signifiers as your practice evolves. Keep it minimal - too many symbols slow you down."
-    ctx.renderer.add_text(page, custom_text, ctx.layout.content_left, y, font_small, ctx.theme.gray, italic=True)
-    y += 40
+    ctx.renderer.add_text(page, custom_text, ctx.layout.content_left, y, font_small - 2, italic=True)
+    y += 50
 
-    # Key insight box - increased height and padding
+    # Key insight box - fill remaining space to bottom margin
     insight_y = y
-    insight_height = 120
-    insight_padding = 25
+    bottom_margin = 35
+    insight_height = ctx.layout.content_bottom - insight_y - bottom_margin
+    insight_padding = 28
     page.draw_rect(
         fitz.Rect(ctx.layout.content_left, insight_y, ctx.layout.content_right, insight_y + insight_height),
         color=ctx.theme.gray,
         width=0.5,
     )
-    # Quote mark or title - more vertical padding
-    ctx.renderer.add_text(page, "The Core Insight", ctx.layout.content_left + insight_padding, insight_y + insight_padding, font_section + 2)
-    # Insight text - more spacing from title
+    # Title
+    ctx.renderer.add_text(page, "The Core Insight", ctx.layout.content_left + insight_padding, insight_y + insight_padding, font_section)
+    # Insight text with more breathing room
     insight_text = (
         "The power of Bullet Journal lies not in the symbols, but in the reflection they encourage. "
         "Every time you transform a bullet, you ask: does this still deserve my time and attention?"
     )
     ctx.renderer.draw_rich_text(
         page, insight_text,
-        ctx.layout.content_left + insight_padding, insight_y + 60,
-        font_small + 1, ctx.layout.content_width - insight_padding * 2, 1.45
+        ctx.layout.content_left + insight_padding, insight_y + 65,
+        font_small, ctx.layout.content_width - insight_padding * 2, 1.6
     )
 
 
 def generate_guide_set_up_logs(ctx: PageContext, page_idx: int) -> None:
     """Generate Set up your logs page with elegant card-based layout."""
     page = ctx.renderer.doc[page_idx]
-    font_body = 22
-    font_small = 19
-    font_section = 20
+    font_body = 28
+    font_small = 25
+    font_section = 25
     line_height = 1.45
     card_padding = 20
 
@@ -938,9 +965,9 @@ def generate_guide_set_up_logs(ctx: PageContext, page_idx: int) -> None:
 def generate_guide_practice(ctx: PageContext, page_idx: int) -> None:
     """Generate The Practice page - T.A.M.E. framework with elegant card-based layout."""
     page = ctx.renderer.doc[page_idx]
-    font_body = 22
-    font_section = 20
-    font_small = 18
+    font_body = 28
+    font_section = 25
+    font_small = 23
     line_height = 1.45
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
@@ -1049,27 +1076,46 @@ def generate_guide_practice(ctx: PageContext, page_idx: int) -> None:
         color=ctx.theme.gray,
         width=0.5,
     )
-    y += 35
+    y += 40
 
-    font_rhythm = 20
-    rhythm_line_height = 1.5
+    font_rhythm = 25
+    font_detail = 24
+    rhythm_line_height = 1.45
+    indent = 20
+    detail_indent = 40
 
-    # Daily with digital hint
-    ctx.renderer.draw_rich_text(page, "|Daily:| Morning and evening - quick review and planning.", ctx.layout.content_left + 20, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
-    y += font_rhythm * rhythm_line_height + 5
-    ctx.renderer.add_text(page, "For deeper reflection, use a digital journal or note-taking app.", ctx.layout.content_left + 40, y, font_rhythm - 2, ctx.theme.gray, italic=True)
-    y += font_rhythm * rhythm_line_height + 10
+    # Daily reflection
+    ctx.renderer.draw_rich_text(page, "|Daily| - Every evening on Daily Log page", ctx.layout.content_left + indent, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
+    y += font_rhythm * rhythm_line_height + 4
+    ctx.renderer.add_text(page, "Review today's entries. Cross off completed tasks.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height
+    ctx.renderer.add_text(page, "Migrate unfinished items to tomorrow or Future Log.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height
+    ctx.renderer.add_text(page, "Set 1-3 priorities for tomorrow.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height + 15
 
-    # Weekly with new suggestion
-    height = ctx.renderer.draw_rich_text(page, "|Weekly:| Sunday evening - tidy the week, acknowledge progress.", ctx.layout.content_left + 20, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
-    y += height + 5
-    ctx.renderer.add_text(page, "Review what worked and what didn't. Adjust your approach for next week.", ctx.layout.content_left + 40, y, font_rhythm - 2, ctx.theme.gray, italic=True)
-    y += font_rhythm * rhythm_line_height + 10
+    # Weekly reflection
+    ctx.renderer.draw_rich_text(page, "|Weekly| - Sunday on Weekly Reflection page", ctx.layout.content_left + indent, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
+    y += font_rhythm * rhythm_line_height + 4
+    ctx.renderer.add_text(page, "Review Weekly Action plan: what got done, what didn't.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height
+    ctx.renderer.add_text(page, "Acknowledge progress toward/away from goals.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height
+    ctx.renderer.add_text(page, "Migrate remaining tasks. Set next week's focus.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height + 15
 
-    # Monthly with digital hint
-    height = ctx.renderer.draw_rich_text(page, "|Monthly:| End of month - identify patterns, adjust direction.", ctx.layout.content_left + 20, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
-    y += height + 5
-    ctx.renderer.add_text(page, "Consider a longer writing session to explore what you've learned.", ctx.layout.content_left + 40, y, font_rhythm - 2, ctx.theme.gray, italic=True)
+    # Monthly reflection
+    ctx.renderer.draw_rich_text(page, "|Monthly| - Last day on Monthly Timeline page", ctx.layout.content_left + indent, y, font_rhythm, ctx.layout.content_width - 60, rhythm_line_height)
+    y += font_rhythm * rhythm_line_height + 4
+    ctx.renderer.add_text(page, "Review Monthly Timeline: events, patterns, surprises.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height
+    ctx.renderer.add_text(page, "Check Intention and Goals pages. Are you on track?", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height
+    ctx.renderer.add_text(page, "Migrate incomplete items. Set next month's direction.", ctx.layout.content_left + detail_indent, y, font_detail)
+    y += font_detail * rhythm_line_height + 20
+
+    # Tip
+    ctx.renderer.add_text(page, "Tip: On week/month end, Daily Log shows a Reflection link.", ctx.layout.content_left + indent, y, font_detail, italic=True)
 
 
 def generate_guide_intention(ctx: PageContext, page_idx: int) -> None:
@@ -1168,7 +1214,6 @@ def generate_monthly_timeline(ctx: PageContext, page_idx: int, month_idx: int) -
         ctx.renderer.links.add(page_idx, link_rect, dest_page)
 
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["monthly_timeline"])
-    ctx.renderer.add_bottom_nav(page_idx, [("Year", ctx.page_map.year_index)])
 
 
 def generate_monthly_action_plan(ctx: PageContext, page_idx: int, month_idx: int) -> None:
@@ -1184,57 +1229,55 @@ def generate_monthly_action_plan(ctx: PageContext, page_idx: int, month_idx: int
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["monthly_action"])
 
 
-def draw_date_range_input(ctx: PageContext, page: fitz.Page, x: float, y: float, font_size: float = 24) -> None:
-    line_width = 25
-    slash_spacing = 8
+def _draw_clickable_week_date_range(ctx: PageContext, page_idx: int, week_num: int, x: float, y: float, font_size: float) -> None:
+    """Draw week date range with clickable start/end dates linking to daily pages.
+
+    If the week spans across years, clip dates to the current year boundaries.
+    """
+    import calendar as cal_module
+    from datetime import date as date_type
+    page = ctx.renderer.doc[page_idx]
+    start_date, end_date = ctx.calendar.week_date_range(week_num)
+
+    # Clip dates to current year boundaries
+    year = ctx.calendar.year
+    if start_date.year < year:
+        start_date = date_type(year, 1, 1)  # Jan 1 of current year
+    if end_date.year > year:
+        end_date = date_type(year, 12, 31)  # Dec 31 of current year
+
+    # Format: "Jan 1" - "Jan 4" with clickable dates
+    start_label = f"{cal_module.month_abbr[start_date.month]} {start_date.day}"
+    end_label = f"{cal_module.month_abbr[end_date.month]} {end_date.day}"
+    separator = " - "
 
     current_x = x
-    line_y = y + font_size - 2
 
-    page.draw_line(
-        fitz.Point(current_x, line_y),
-        fitz.Point(current_x + line_width, line_y),
-        color=ctx.theme.gray,
-        width=0.8,
-    )
-    current_x += line_width + slash_spacing
-    ctx.renderer.add_text(page, "/", current_x, y, font_size, ctx.theme.black)
-    current_x += 12
-    page.draw_line(
-        fitz.Point(current_x, line_y),
-        fitz.Point(current_x + line_width, line_y),
-        color=ctx.theme.gray,
-        width=0.8,
-    )
-    current_x += line_width + 20
+    # Start date (always clickable since we clipped to current year)
+    start_day_of_year = ctx.calendar.day_of_year(start_date.month - 1, start_date.day)
+    start_page = ctx.page_map.daily_page(start_day_of_year)
+    ctx.renderer.add_nav_link(page_idx, start_label, start_page, current_x, y, font_size, with_arrow=False)
+    current_x += ctx.renderer.get_text_width(start_label, font_size)
 
-    ctx.renderer.add_text(page, "to", current_x, y, font_size, ctx.theme.black, italic=True)
-    current_x += 30
+    # Separator (non-clickable)
+    ctx.renderer.add_text(page, separator, current_x, y, font_size, ctx.theme.gray)
+    current_x += ctx.renderer.get_text_width(separator, font_size)
 
-    page.draw_line(
-        fitz.Point(current_x, line_y),
-        fitz.Point(current_x + line_width, line_y),
-        color=ctx.theme.gray,
-        width=0.8,
-    )
-    current_x += line_width + slash_spacing
-    ctx.renderer.add_text(page, "/", current_x, y, font_size, ctx.theme.black)
-    current_x += 12
-    page.draw_line(
-        fitz.Point(current_x, line_y),
-        fitz.Point(current_x + line_width, line_y),
-        color=ctx.theme.gray,
-        width=0.8,
-    )
+    # End date (always clickable since we clipped to current year)
+    end_day_of_year = ctx.calendar.day_of_year(end_date.month - 1, end_date.day)
+    end_page = ctx.page_map.daily_page(end_day_of_year)
+    ctx.renderer.add_nav_link(page_idx, end_label, end_page, current_x, y, font_size, with_arrow=False)
 
 
-def generate_weekly_action_plan(ctx: PageContext, page_idx: int) -> None:
+def generate_weekly_action_plan(ctx: PageContext, page_idx: int, week_idx: int) -> None:
     page = ctx.renderer.doc[page_idx]
+    week_num = week_idx + 1
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
-    ctx.renderer.add_text(page, "Weekly Action plan", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
+    ctx.renderer.add_text(page, f"W{week_num} Action plan", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
 
-    draw_date_range_input(ctx, page, ctx.layout.content_right - 220, ctx.layout.content_top + 55, 22)
+    # Auto-fill date range from calendar with clickable dates
+    _draw_clickable_week_date_range(ctx, page_idx, week_num, ctx.layout.content_right - 180, ctx.layout.content_top + 55, 22)
 
     # Extend dot grid to just above footer
     ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.target_height - 70)
@@ -1242,13 +1285,15 @@ def generate_weekly_action_plan(ctx: PageContext, page_idx: int) -> None:
     ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["weekly_action"])
 
 
-def generate_weekly_reflection(ctx: PageContext, page_idx: int) -> None:
+def generate_weekly_reflection(ctx: PageContext, page_idx: int, week_idx: int) -> None:
     page = ctx.renderer.doc[page_idx]
+    week_num = week_idx + 1
 
     ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.main_index, ctx.layout.content_left, ctx.layout.content_top + 5)
-    ctx.renderer.add_text(page, "Weekly Reflection", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
+    ctx.renderer.add_text(page, f"W{week_num} Reflection", ctx.layout.content_left, ctx.layout.content_top + 50, ctx.typography.sizes["title_page"])
 
-    draw_date_range_input(ctx, page, ctx.layout.content_right - 220, ctx.layout.content_top + 55, 22)
+    # Auto-fill date range from calendar with clickable dates
+    _draw_clickable_week_date_range(ctx, page_idx, week_num, ctx.layout.content_right - 180, ctx.layout.content_top + 55, 22)
 
     # Extend dot grid to just above footer
     ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 115, ctx.layout.target_height - 70)
@@ -1259,57 +1304,121 @@ def generate_weekly_reflection(ctx: PageContext, page_idx: int) -> None:
 def generate_daily_log(ctx: PageContext, page_idx: int, month_idx: int, day: int) -> None:
     page = ctx.renderer.doc[page_idx]
 
-    ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.year_index, ctx.layout.content_left, ctx.layout.content_top + 5)
+    # Breadcrumb navigation: ← Index / January / W1
+    # Larger spacing for touch-friendly operation on reMarkable
+    nav_y = ctx.layout.content_top + 5
+    nav_font = ctx.typography.sizes["nav"]
+    sep = "/"
+    sep_color = ctx.theme.gray
+    touch_gap = 30  # Extra spacing between elements for finger tapping
 
+    # ← Index (with arrow, clickable)
+    ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.year_index, ctx.layout.content_left, nav_y)
+
+    # Calculate position after "← Index"
+    index_text_width = ctx.renderer.get_text_width("Index", nav_font)
+    arrow_offset = nav_font * 0.5 * 1.5 + 8  # arrow size + padding
+    x = ctx.layout.content_left + arrow_offset + index_text_width + touch_gap
+
+    # Separator
+    ctx.renderer.add_text(page, sep, x, nav_y, nav_font, sep_color)
+    x += ctx.renderer.get_text_width(sep, nav_font) + touch_gap
+
+    # Check for reflection reminders first (affects breadcrumb structure)
+    is_last_of_week = ctx.calendar.is_last_day_of_week(month_idx, day)
+    is_last_of_month = ctx.calendar.is_last_day_of_month(month_idx, day)
+
+    # Determine footer text based on day type
+    footer_key = "daily_log"
+    if is_last_of_month:
+        footer_key = "daily_log_month_end"
+    elif is_last_of_week:
+        footer_key = "daily_log_week_end"
+
+    # Month name (clickable, no arrow)
+    month_name = ctx.calendar.months[month_idx].name
+    monthly_page = ctx.page_map.month_timeline(month_idx)
+    ctx.renderer.add_nav_link(page_idx, month_name, monthly_page, x, nav_y, with_arrow=False)
+    x += ctx.renderer.get_text_width(month_name, nav_font) + touch_gap
+
+    # Monthly Reflection link (placed right after month, if month end)
+    if is_last_of_month:
+        ctx.renderer.add_text(page, sep, x, nav_y, nav_font, sep_color)
+        x += ctx.renderer.get_text_width(sep, nav_font) + touch_gap
+        ctx.renderer.add_nav_link(page_idx, "Reflection", monthly_page, x, nav_y, with_arrow=False)
+        x += ctx.renderer.get_text_width("Reflection", nav_font) + touch_gap
+
+    # Separator before week
+    ctx.renderer.add_text(page, sep, x, nav_y, nav_font, sep_color)
+    x += ctx.renderer.get_text_width(sep, nav_font) + touch_gap
+
+    # Week (clickable, no arrow)
     week_num = ctx.calendar.week_of_date(month_idx, day)
     week_label = f"W{week_num}"
     week_page = ctx.page_map.weekly_action(week_num - 1)
-    week_x = ctx.layout.content_left + 80
-    ctx.renderer.add_nav_link(page_idx, week_label, week_page, week_x, ctx.layout.content_top + 5)
+    ctx.renderer.add_nav_link(page_idx, week_label, week_page, x, nav_y, with_arrow=False)
+    x += ctx.renderer.get_text_width(week_label, nav_font) + touch_gap
 
-    month_name = ctx.calendar.months[month_idx].name
-    monthly_page = ctx.page_map.month_timeline(month_idx)
-    monthly_text_width = ctx.renderer.get_text_width(month_name, ctx.typography.sizes["nav"])
-    ctx.renderer.add_nav_link(
-        page_idx,
-        month_name,
-        monthly_page,
-        ctx.layout.content_right - monthly_text_width - 40,
-        ctx.layout.content_top + 5,
-    )
+    # Weekly Reflection link (placed right after week, if week end)
+    if is_last_of_week:
+        weekly_reflection_page = ctx.page_map.weekly_reflection(week_num - 1)
+        ctx.renderer.add_text(page, sep, x, nav_y, nav_font, sep_color)
+        x += ctx.renderer.get_text_width(sep, nav_font) + touch_gap
+        ctx.renderer.add_nav_link(page_idx, "Reflection", weekly_reflection_page, x, nav_y, with_arrow=False)
 
-    date_label = ctx.calendar.date_label(month_idx, day)
+    # Include day-of-week abbreviation: "Mon, Jan 15"
+    day_abbrev = ctx.calendar.day_of_week_abbrev(month_idx, day)
+    date_label = f"{day_abbrev}, {ctx.calendar.date_label(month_idx, day)}"
     ctx.renderer.add_text(page, date_label, ctx.layout.content_left, ctx.layout.content_top + 70, ctx.typography.sizes["title_page"])
 
     # Extend dot grid to just above footer
     ctx.renderer.draw_dot_grid(page, ctx.layout.content_top + 145, ctx.layout.target_height - 70)
 
-    ctx.renderer.draw_footer_section(page, FOOTER_TEXTS["daily_log"])
+    ctx.renderer.draw_footer_section(page, FOOTER_TEXTS[footer_key])
 
 
 def generate_daily_log_continuation(ctx: PageContext, page_idx: int, month_idx: int, day: int) -> None:
     page = ctx.renderer.doc[page_idx]
 
-    ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.year_index, ctx.layout.content_left, ctx.layout.content_top + 5)
+    # Breadcrumb navigation: ← Index / January / W1
+    # Larger spacing for touch-friendly operation on reMarkable
+    nav_y = ctx.layout.content_top + 5
+    nav_font = ctx.typography.sizes["nav"]
+    sep = "/"
+    sep_color = ctx.theme.gray
+    touch_gap = 30  # Extra spacing between elements for finger tapping
 
+    # ← Index (with arrow, clickable)
+    ctx.renderer.add_nav_link(page_idx, "Index", ctx.page_map.year_index, ctx.layout.content_left, nav_y)
+
+    # Calculate position after "← Index"
+    index_text_width = ctx.renderer.get_text_width("Index", nav_font)
+    arrow_offset = nav_font * 0.5 * 1.5 + 8  # arrow size + padding
+    x = ctx.layout.content_left + arrow_offset + index_text_width + touch_gap
+
+    # Separator
+    ctx.renderer.add_text(page, sep, x, nav_y, nav_font, sep_color)
+    x += ctx.renderer.get_text_width(sep, nav_font) + touch_gap
+
+    # Month name (clickable, no arrow)
+    month_name = ctx.calendar.months[month_idx].name
+    monthly_page = ctx.page_map.month_timeline(month_idx)
+    ctx.renderer.add_nav_link(page_idx, month_name, monthly_page, x, nav_y, with_arrow=False)
+    x += ctx.renderer.get_text_width(month_name, nav_font) + touch_gap
+
+    # Separator
+    ctx.renderer.add_text(page, sep, x, nav_y, nav_font, sep_color)
+    x += ctx.renderer.get_text_width(sep, nav_font) + touch_gap
+
+    # Week (clickable, no arrow)
     week_num = ctx.calendar.week_of_date(month_idx, day)
     week_label = f"W{week_num}"
     week_page = ctx.page_map.weekly_action(week_num - 1)
-    week_x = ctx.layout.content_left + 80
-    ctx.renderer.add_nav_link(page_idx, week_label, week_page, week_x, ctx.layout.content_top + 5)
+    ctx.renderer.add_nav_link(page_idx, week_label, week_page, x, nav_y, with_arrow=False)
 
-    month_name = ctx.calendar.months[month_idx].name
-    monthly_page = ctx.page_map.month_timeline(month_idx)
-    monthly_text_width = ctx.renderer.get_text_width(month_name, ctx.typography.sizes["nav"])
-    ctx.renderer.add_nav_link(
-        page_idx,
-        month_name,
-        monthly_page,
-        ctx.layout.content_right - monthly_text_width - 40,
-        ctx.layout.content_top + 5,
-    )
-
-    date_label = ctx.calendar.date_label(month_idx, day)
+    # Include day-of-week abbreviation: "Mon, Jan 15"
+    day_abbrev = ctx.calendar.day_of_week_abbrev(month_idx, day)
+    date_label = f"{day_abbrev}, {ctx.calendar.date_label(month_idx, day)}"
     ctx.renderer.add_text(page, date_label, ctx.layout.content_left, ctx.layout.content_top + 70, ctx.typography.sizes["title_page"])
 
     # Continuation pages have no footer, extend grid closer to bottom
